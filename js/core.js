@@ -133,6 +133,7 @@
   UT.font = {
     display: "'Bungee', 'Arial Black', Impact, sans-serif",
     ui: "'Rubik', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    graffiti: "'Permanent Marker', 'Bungee', 'Comic Sans MS', cursive",
   };
 
   /* ---------- drawing helpers ---------- */
