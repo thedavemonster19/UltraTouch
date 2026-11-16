@@ -106,6 +106,7 @@
       board() { tone(110, 0.16, 'sine', 0.25, 70); },
       bounce() { tone(90, 0.1, 'sine', 0.18, 60); },
       heat() { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.12, 'square', 0.07, 0, i * 0.06)); },
+      thunder() { noise(0.9, 0.35, 180, 0.5); noise(0.4, 0.25, 900, 0.7, 0.05); tone(60, 0.8, 'sawtooth', 0.08, 35); },
       horn() { tone(140, 0.7, 'sawtooth', 0.12); tone(147, 0.7, 'square', 0.06); },
       tick() { tone(1400, 0.03, 'square', 0.05); },
       select() { tone(880, 0.05, 'triangle', 0.1); },
