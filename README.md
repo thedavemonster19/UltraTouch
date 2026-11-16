@@ -12,7 +12,8 @@ No build step: plain HTML, CSS and JS. Canvas games are drawn at a 540-unit-tall
 ## Run it
 
 - **Local:** `python3 -m http.server` in this folder, then open `http://localhost:8000` (or open `dist/ultratouch.html` directly).
-- **Phone, full screen:** host the folder over HTTPS (GitHub Pages works: Settings → Pages → deploy from branch, root), open it on the phone, then
+- **Live site (GitHub Pages):** https://thedavemonster19.github.io/UltraTouch/ (Settings → Pages → Deploy from a branch → `main` / root). Send that link to friends.
+- **Phone, full screen:** open the site on the phone, then
   - **iOS Safari:** Share → *Add to Home Screen*. It launches without browser chrome. iOS can't lock orientation from the web, so a "turn your phone sideways" card shows in portrait.
   - **Android Chrome:** *Install app* / *Add to Home screen* (fullscreen + landscape from the manifest), or tap **Full screen** on the menu, which also locks landscape.
 - Works offline after the first visit (service worker, hosted copy only).
