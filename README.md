@@ -19,6 +19,10 @@ No build step: plain HTML, CSS and JS. Canvas games are drawn at a 540-unit-tall
 - Works offline after the first visit (service worker, hosted copy only).
 - `python3 tools/build_single.py` makes the one-file `dist/ultratouch.html`. Add `--fragment` for the Artifact version.
 
+## Sound
+
+All sound is synthesized live with Web Audio (no files). Swish Shot: shot whoosh, a net swish + score chime + short cheer on every bucket (extra sparkle for a clean swish), rim clang, backboard thud, ball bounce, and on a 3-in-a-row streak a thunder crack, electric zap, power-up run and crowd roar, then a zap on every bucket while the streak lasts. Everything runs through a limiter so big moments are loud without crackling. On iPhone the page asks for media playback (Audio Session API plus a silent looping clip), so sound plays even with the ring/silent switch on silent; phone volume still applies. Sound on/off is on the menu and in the pause sheet.
+
 ## Files
 
 ```

@@ -229,7 +229,8 @@
       const at = this.proj(this.hoopX(), RIM_Y + 0.7, r.z);
       this.popups.add((kind === 'swish' ? 'SWISH +' : '+') + pts, at.x, at.y - 10, kind === 'swish' ? C.mint : C.amber, 30);
       this.netSwing = 1;
-      UT.sfx.swish();
+      UT.sfx.swish(kind === 'swish');
+      if (this.heat) UT.sfx.zap();
       if (this.streak === 3 && !this.heat) {
         this.heat = true;
         this.P.score += HEAT_BONUS;

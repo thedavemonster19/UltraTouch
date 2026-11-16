@@ -7,6 +7,7 @@
   const overlay = $('#overlay');
   const pauseBtn = $('#btn-pause');
   const stage = (UT.stage = new UT.Stage($('#stage')));
+  ['touchend', 'click', 'pointerdown', 'keydown'].forEach((ev) => document.addEventListener(ev, () => UT.sfx.unlock(), { passive: true }));
 
   /* Fit the app to the part of the screen you can actually see. Mobile Safari's toolbars overlap the page
    * (and grow/shrink as you scroll), so the full window height would push the bottom of the game off-screen. */

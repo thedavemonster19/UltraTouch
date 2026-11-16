@@ -45,17 +45,52 @@
   /* ---------- sound: tiny Web Audio synth, no files ---------- */
   UT.sfx = (function () {
     let ac = null;
+    let master = null;
     let muted = !!UT.store.get('muted', false);
+    const SILENT = 'data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==';
+    let keepAlive = null;
     function ctx() {
       if (!ac) {
         const A = window.AudioContext || window.webkitAudioContext;
         if (!A) return null;
         try { ac = new A(); } catch (e) { return null; }
+        /* everything runs through a compressor so big moments (bucket + streak) are loud without clipping */
+        const comp = ac.createDynamicsCompressor();
+        comp.threshold.value = -20;
+        comp.knee.value = 6;
+        comp.ratio.value = 12;
+        comp.attack.value = 0.002;
+        comp.release.value = 0.2;
+        master = ac.createGain();
+        master.gain.value = 0.75;
+        const makeup = ac.createGain();
+        makeup.gain.value = 1.45;
+        master.connect(comp).connect(makeup).connect(ac.destination);
       }
       if (ac.state === 'suspended') ac.resume().catch(() => {});
       return ac;
     }
-    function tone(freq, dur, type, vol, slideTo, delay) {
+    /* iPhone mutes web audio when the ring/silent switch is on silent. Marking the page as media playback
+     * (Audio Session API, Safari 17+) and holding a silent looping <audio> lets game sounds through. */
+    function iosPlayback() {
+      try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* older Safari */ }
+      if (keepAlive) return;
+      try {
+        keepAlive = new Audio(SILENT);
+        keepAlive.loop = true;
+        keepAlive.setAttribute('playsinline', '');
+        keepAlive.volume = 0.01;
+        const p = keepAlive.play();
+        if (p && p.catch) p.catch(() => { keepAlive = null; });
+      } catch (e) { keepAlive = null; }
+    }
+    function out() { return master || ac.destination; }
+    function env(g, t, vol, attack, dur) {
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+    }
+    function tone(freq, dur, type, vol, slideTo, delay, attack) {
       if (muted) return;
       const c = ctx();
       if (!c) return;
@@ -65,56 +100,83 @@
       o.type = type || 'square';
       o.frequency.setValueAtTime(freq, t);
       if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(30, slideTo), t + dur);
-      g.gain.setValueAtTime(vol == null ? 0.12 : vol, t);
-      g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
-      o.connect(g).connect(c.destination);
+      env(g, t, vol == null ? 0.12 : vol, attack || 0.004, dur);
+      o.connect(g).connect(out());
       o.start(t);
-      o.stop(t + dur + 0.03);
+      o.stop(t + dur + 0.05);
     }
     let noiseBuf = null;
-    function noise(dur, vol, freq, q, delay) {
+    /* filtered noise; freq can sweep to freqTo, and attack > 0 makes a swell (crowd) instead of a hit */
+    function noise(dur, vol, freq, q, delay, opts) {
       if (muted) return;
       const c = ctx();
       if (!c) return;
+      opts = opts || {};
       if (!noiseBuf) {
-        noiseBuf = c.createBuffer(1, c.sampleRate, c.sampleRate);
+        noiseBuf = c.createBuffer(1, c.sampleRate * 2, c.sampleRate);
         const d = noiseBuf.getChannelData(0);
         for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
       }
       const t = c.currentTime + (delay || 0);
       const src = c.createBufferSource();
       src.buffer = noiseBuf;
+      src.loop = true;
       const f = c.createBiquadFilter();
-      f.type = 'bandpass';
-      f.frequency.value = freq || 1500;
+      f.type = opts.type || 'bandpass';
+      f.frequency.setValueAtTime(freq || 1500, t);
+      if (opts.freqTo) f.frequency.exponentialRampToValueAtTime(opts.freqTo, t + dur);
       f.Q.value = q || 0.8;
       const g = c.createGain();
-      g.gain.setValueAtTime(vol || 0.2, t);
-      g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
-      src.connect(f).connect(g).connect(c.destination);
-      src.start(t);
-      src.stop(t + dur + 0.03);
+      env(g, t, vol || 0.2, opts.attack || 0.003, dur);
+      src.connect(f).connect(g).connect(out());
+      src.start(t, Math.random());
+      src.stop(t + dur + 0.05);
     }
+    const crowd = (dur, vol, delay) => {
+      noise(dur, vol, 900, 0.4, delay, { attack: dur * 0.3 });
+      noise(dur, vol * 0.6, 2200, 0.6, (delay || 0) + 0.05, { attack: dur * 0.35 });
+    };
     return {
-      unlock() { ctx(); },
+      unlock() { ctx(); iosPlayback(); },
       get muted() { return muted; },
       setMuted(m) { muted = !!m; UT.store.set('muted', muted); },
-      tap() { tone(700, 0.05, 'triangle', 0.1); },
-      shoot() { noise(0.22, 0.12, 700, 0.6); },
-      swish() { noise(0.35, 0.22, 4200, 0.7); noise(0.25, 0.1, 2500, 1, 0.05); },
-      rim() { tone(260, 0.18, 'square', 0.08, 180); tone(390, 0.12, 'triangle', 0.08); },
-      board() { tone(110, 0.16, 'sine', 0.25, 70); },
-      bounce() { tone(90, 0.1, 'sine', 0.18, 60); },
-      heat() { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.12, 'square', 0.07, 0, i * 0.06)); },
-      thunder() { noise(0.9, 0.35, 180, 0.5); noise(0.4, 0.25, 900, 0.7, 0.05); tone(60, 0.8, 'sawtooth', 0.08, 35); },
-      horn() { tone(140, 0.7, 'sawtooth', 0.12); tone(147, 0.7, 'square', 0.06); },
-      tick() { tone(1400, 0.03, 'square', 0.05); },
-      select() { tone(880, 0.05, 'triangle', 0.1); },
-      match(n) { const b = 520 + Math.min(n || 0, 8) * 40; tone(b, 0.08, 'triangle', 0.12); tone(b * 1.5, 0.12, 'triangle', 0.1, 0, 0.06); },
-      nope() { tone(160, 0.14, 'square', 0.08, 120); },
-      deal() { noise(0.06, 0.1, 3000, 1.2); },
-      win() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.16, 'triangle', 0.1, 0, i * 0.09)); },
-      lose() { [392, 330, 262].forEach((f, i) => tone(f, 0.22, 'triangle', 0.1, 0, i * 0.16)); },
+      tap() { tone(700, 0.05, 'triangle', 0.12); },
+      /* basketball */
+      shoot() { noise(0.25, 0.18, 500, 0.7, 0, { freqTo: 1400 }); tone(180, 0.08, 'sine', 0.2, 90); },
+      /* sinking a bucket: net "shhk" sweep, a bright two-note score chime and a short cheer */
+      swish(clean) {
+        noise(0.42, 0.55, 2500, 0.9, 0, { type: 'highpass', freqTo: 7000 });
+        noise(0.3, 0.3, 5200, 1.2, 0.04);
+        tone(880, 0.16, 'triangle', 0.22, 0, 0.05);
+        tone(1320, 0.28, 'triangle', 0.22, 0, 0.13);
+        if (clean) tone(1760, 0.3, 'sine', 0.16, 0, 0.21);
+        crowd(0.9, 0.16, 0.08);
+      },
+      /* extra crackle on every bucket while the streak is live */
+      zap() { tone(1900, 0.18, 'sawtooth', 0.12, 260); noise(0.12, 0.25, 6000, 1.5); },
+      rim() { [523, 811, 1187].forEach((f, i) => tone(f, 0.32 - i * 0.06, 'triangle', 0.14, f * 0.97)); noise(0.06, 0.25, 3000, 2); },
+      board() { tone(120, 0.18, 'sine', 0.4, 70); noise(0.08, 0.3, 400, 1); },
+      bounce() { tone(95, 0.12, 'sine', 0.3, 55); },
+      /* three in a row: thunder crack, electric zap, power-up run and the crowd going up */
+      heat() {
+        [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.16, 'square', 0.1, 0, 0.18 + i * 0.07));
+        tone(2200, 0.5, 'sawtooth', 0.14, 120, 0.02);
+        crowd(1.8, 0.28, 0.1);
+      },
+      thunder() {
+        noise(0.18, 0.9, 3500, 0.5, 0, { type: 'highpass' });
+        noise(1.6, 0.85, 220, 0.4, 0.04, { type: 'lowpass', freqTo: 60 });
+        tone(55, 1.4, 'sawtooth', 0.18, 32, 0.05);
+      },
+      horn() { tone(140, 0.8, 'sawtooth', 0.2); tone(147, 0.8, 'square', 0.1); },
+      tick() { tone(1400, 0.035, 'square', 0.08); },
+      /* cards */
+      select() { tone(880, 0.05, 'triangle', 0.12); },
+      match(n) { const b = 520 + Math.min(n || 0, 8) * 40; tone(b, 0.08, 'triangle', 0.16); tone(b * 1.5, 0.14, 'triangle', 0.14, 0, 0.06); },
+      nope() { tone(160, 0.14, 'square', 0.1, 120); },
+      deal() { noise(0.06, 0.18, 3000, 1.2); },
+      win() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.18, 'triangle', 0.14, 0, i * 0.09)); },
+      lose() { [392, 330, 262].forEach((f, i) => tone(f, 0.24, 'triangle', 0.14, 0, i * 0.16)); },
     };
   })();
 
