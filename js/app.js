@@ -23,6 +23,7 @@
     }
     stage.resize();
     fitHub();
+    fitSheet();
   }
   /* shrink the whole menu to fit the visible height in landscape, so nothing hides under the toolbar */
   const hubInner = document.querySelector('.hub-inner');
@@ -47,6 +48,7 @@
   }
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHub);
   window.addEventListener('resize', fitHub);
+  window.addEventListener('resize', () => fitSheet());
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', fitViewport);
     window.visualViewport.addEventListener('scroll', fitViewport);
@@ -169,8 +171,19 @@
       box.appendChild(b);
     });
     overlay.hidden = false;
+    fitSheet();
     const first = box.querySelector('.primary') || box.querySelector('button');
     if (first) first.focus({ preventScroll: true });
+  }
+  /* scale the open sheet down if it is taller than the visible screen, so its buttons are always on screen */
+  const sheetEl = document.querySelector('.sheet');
+  function fitSheet() {
+    if (overlay.hidden) return;
+    sheetEl.style.transform = '';
+    const cs = getComputedStyle(overlay);
+    const availH = overlay.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const s = Math.min(1, (availH - 4) / sheetEl.offsetHeight);
+    if (s < 1) sheetEl.style.transform = 'scale(' + s + ')';
   }
   function closeSheet() {
     overlay.hidden = true;
@@ -241,7 +254,7 @@
       body += '<p class="note">' + esc(r.reason) + ' · reached deal ' + r.level + ' · ' + r.pairs + ' pairs, ' + r.runs + ' runs</p>';
     }
     if (ranks.includes(0)) body = '<p class="center"><span class="badge">NEW BEST</span></p>' + body;
-    body += '<p class="note">Top scores on this device</p>' + tableHtml(r.game, ranks);
+    body = '<div class="split"><div class="summary">' + body + '</div><div class="board"><p class="note">Top scores on this device</p>' + tableHtml(r.game, ranks) + '</div></div>';
     sheet(r.game === 'swish' ? 'Final buzzer' : 'Cards down', body, [
       { label: 'Play again', primary: true, run: () => start(r.game) },
       { label: 'Menu', run: toHub },

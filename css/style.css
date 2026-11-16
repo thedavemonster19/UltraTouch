@@ -189,31 +189,34 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
   padding-block: 12px;
 }
 .sheet {
-  width: min(560px, 100%);
-  max-height: 100%;
-  overflow-y: auto;
+  width: min(760px, 100%);
   background: var(--night);
   border: 2px solid var(--amber);
   border-radius: 20px;
-  padding: 18px 22px;
+  padding: 14px 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  transform-origin: center center;
 }
-.sheet h2 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 26px; color: var(--amber); text-align: center; }
-#sheet-body { display: flex; flex-direction: column; gap: 10px; }
-.big-score { font-family: var(--font-display); font-size: 40px; text-align: center; color: var(--text); font-variant-numeric: tabular-nums; }
-.note { text-align: center; color: var(--dim); font-size: 14px; margin: 0; }
+.sheet h2 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 24px; color: var(--amber); text-align: center; }
+#sheet-body { display: flex; flex-direction: column; gap: 8px; }
+/* results: summary on the left, the device's top scores on the right */
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: center; }
+.split > div { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.board { background: var(--panel); border-radius: 14px; padding: 10px 14px; }
+.big-score { font-family: var(--font-display); font-size: 38px; line-height: 1.1; text-align: center; color: var(--text); font-variant-numeric: tabular-nums; }
+.note { text-align: center; color: var(--dim); font-size: 13px; line-height: 1.35; margin: 0; }
 .badge { display: inline-block; background: var(--coral); color: #fff; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 800; letter-spacing: 0.06em; }
-.center { text-align: center; }
-.scores { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 14px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.center { text-align: center; margin: 0; }
+.scores { display: grid; grid-template-columns: auto 1fr auto; gap: 3px 12px; font-size: 13px; font-variant-numeric: tabular-nums; }
 .scores .rank { color: var(--dim); }
 .scores .val { text-align: right; font-weight: 800; }
 .scores .me { color: var(--amber); }
 .sheet-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 .sheet-actions button {
   border-radius: 12px;
-  padding: 10px 20px;
+  padding: 10px 22px;
   border: 1px solid var(--line);
   background: var(--panel);
   font-weight: 700;
@@ -256,4 +259,5 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
   #hub { align-items: flex-start; }
   .hub-inner { grid-template-columns: 1fr; }
   .tiles { grid-template-columns: 1fr; }
+  .split { grid-template-columns: 1fr; }
 }
