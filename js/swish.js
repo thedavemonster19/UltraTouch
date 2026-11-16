@@ -9,13 +9,13 @@
   const D = UT.draw;
 
   /* z = hoop depth (m, sets its size and height); cross = seconds for the hoop to glide edge to edge;
-   * need = baskets out of BALLS to qualify; pts = per basket. */
+   * need = baskets out of BALLS to qualify. */
   const ROUNDS = [
-    { z: 4.6, cross: 5.2, need: 6, pts: 10 },
-    { z: 5.6, cross: 4.6, need: 7, pts: 15 },
-    { z: 6.6, cross: 4.1, need: 7, pts: 20 },
-    { z: 7.6, cross: 3.6, need: 8, pts: 25 },
-    { z: 8.6, cross: 3.2, need: 8, pts: 30 },
+    { z: 4.6, cross: 4.3, need: 6 },
+    { z: 5.6, cross: 3.9, need: 7 },
+    { z: 6.6, cross: 3.5, need: 7 },
+    { z: 7.6, cross: 3.15, need: 8 },
+    { z: 8.6, cross: 2.85, need: 8 },
   ];
   const LANES = 5;
   const BALLS = 15;
@@ -31,8 +31,9 @@
   const LAT_S = F / SHOOTER_Z; /* pixels per metre side to side */
   const GAP = 0.45; /* seconds between any two shots */
   const RELOAD = 1.4; /* seconds before the same shooter has a ball again */
-  const SWISH_BONUS = 5;
-  const HEAT_BONUS = 30;
+  const PTS_BASKET = 2;
+  const PTS_SWISH = 3;
+  const PTS_LIGHTNING = 5;
   const JERSEY = '#d9342b';
   const WALL_BOTTOM = 345; /* where the brick wall meets the court */
   const SKIN = ['#8d5524', '#c68642', '#5a3825', '#e0ac69', '#a86b3c'];
@@ -166,8 +167,8 @@
       g.restore();
     }
 
-    /* a slow, floaty lob: about 1.1 s to the rim in round 1, 1.4 s by round 5 */
-    flightTime() { return 0.95 + 0.07 * (this.R.z - SHOOTER_Z); }
+    /* quick lob to the rim (~0.6 s in round 1, ~0.7 s by round 5); the slow part is the sink through the net */
+    flightTime() { return 0.5 + 0.03 * (this.R.z - SHOOTER_Z); }
 
     /* ---------- input ---------- */
     onDown(x) {
@@ -221,8 +222,8 @@
     /* ---------- scoring ---------- */
     make(kind) {
       const r = this.R;
-      let pts = r.pts + (kind === 'swish' ? SWISH_BONUS : 0);
-      if (this.heat) pts *= 2;
+      const pts = this.heat ? PTS_LIGHTNING : kind === 'swish' ? PTS_SWISH : PTS_BASKET;
+      this.boardFlash = 1;
       this.streak++;
       this.roundMade++;
       this.P.made++;
@@ -234,10 +235,9 @@
       if (this.heat) UT.sfx.zap();
       if (this.streak === 3 && !this.heat) {
         this.heat = true;
-        this.P.score += HEAT_BONUS;
         this.flash = 1;
         this.strike = 1.1;
-        this.popups.add('LIGHTNING! +' + HEAT_BONUS + ' · 2× POINTS', this.W / 2, 200, '#bfe9ff', 34);
+        this.popups.add('LIGHTNING! ' + PTS_LIGHTNING + ' PER BASKET', this.W / 2, 200, '#bfe9ff', 34);
         UT.sfx.heat();
         UT.sfx.thunder();
       }
@@ -285,6 +285,7 @@
       this.stateT += dt;
       this.flash = Math.max(0, this.flash - dt * 1.5);
       this.netSwing = Math.max(0, this.netSwing - dt * 1.6);
+      this.boardFlash = Math.max(0, (this.boardFlash || 0) - dt * 3);
       for (const k in this.words) this.words[k] = Math.max(0, this.words[k] - dt * 0.8);
       this.strike = Math.max(0, this.strike - dt);
       /* regenerate the jagged bolts every few frames so they flicker */
@@ -356,7 +357,8 @@
         return;
       }
       if (b.state === 'in') {
-        b.vy = Math.min(b.vy, -2.2) + GRAV * dt;
+        /* the ball hangs and sinks slowly through the net, about half a second */
+        b.vy = -1.1;
         b.y += b.vy * dt;
         b.x = UT.lerp(b.x, this.hoopX(), 0.35);
         b.z = UT.lerp(b.z, r.z, 0.35);
@@ -620,8 +622,19 @@
       if (layer === 'back') {
         const tl = this.projL(hx, -0.9, 3.95, boardZ);
         const br = this.projL(hx, 0.9, 2.9, boardZ);
-        g.fillStyle = '#35b9c6';
+        const bf = this.boardFlash || 0;
+        g.save();
+        if (this.heat) {
+          g.shadowColor = '#7fe8ff';
+          g.shadowBlur = 26 + 14 * Math.sin(performance.now() / 70);
+        }
+        g.fillStyle = this.heat ? '#3fd3f0' : '#eef1f4';
         g.fillRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+        g.restore();
+        if (bf > 0) {
+          g.fillStyle = 'rgba(255,255,255,' + bf + ')';
+          g.fillRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+        }
         g.fillStyle = 'rgba(255,255,255,0.18)';
         g.fillRect(tl.x, tl.y, (br.x - tl.x) * 0.35, br.y - tl.y);
         g.strokeStyle = 'rgba(255,255,255,0.9)';
@@ -629,7 +642,7 @@
         g.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
         const sq1 = this.projL(hx, -0.295, RIM_Y + 0.45, boardZ);
         const sq2 = this.projL(hx, 0.295, RIM_Y + 0.02, boardZ);
-        g.strokeStyle = this.heat ? '#bfe9ff' : '#ffffff';
+        g.strokeStyle = this.heat ? '#ffffff' : '#d9342b';
         g.strokeRect(sq1.x, sq1.y, sq2.x - sq1.x, sq2.y - sq1.y);
         const bk = this.proj(hx, RIM_Y, boardZ);
         g.strokeStyle = '#c8cdd8';
@@ -801,7 +814,7 @@
       this.dim(g);
       if (this.players.length > 1) this.shout(g, this.P.name.toUpperCase(), 120, 30, '#5fe3e6');
       this.shout(g, 'ROUND ' + (this.round + 1), 175, 58, '#f3eee3');
-      const lines = ['Hoop at ' + r.z.toFixed(1) + ' m · make ' + r.need + ' of ' + BALLS + ' before the shot clock hits 00', 'Tap a shooter just before the hoop slides over his lane', '3 in a row = LIGHTNING: +' + HEAT_BONUS + ' and double points'];
+      const lines = ['Hoop at ' + r.z.toFixed(1) + ' m · make ' + r.need + ' of ' + BALLS + ' before the shot clock hits 00', 'Tap a shooter just before the hoop slides over his lane', 'Basket ' + PTS_BASKET + ' · swish ' + PTS_SWISH + ' · 3 in a row = LIGHTNING: ' + PTS_LIGHTNING + ' a basket'];
       lines.forEach((t, i) => D.text(g, t, this.W / 2, 232 + i * 26, i ? 15 : 17, i ? '#f3eee3' : '#ffd23f', { weight: 700, stroke: '#1a0b08', strokeWidth: 4 }));
       if (this.stateT > 0.35) D.text(g, 'TAP TO START', this.W / 2, 330, 18, '#5fe3e6', { weight: 800, stroke: '#1a0b08', strokeWidth: 4 });
     }

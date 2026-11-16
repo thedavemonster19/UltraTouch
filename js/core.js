@@ -21,9 +21,11 @@
   };
 
   /* ---------- high scores: top 5 per game ---------- */
+  /* bump a game's table name when its scoring scale changes, so old scores don't crowd the new ones */
+  UT.SCORE_TABLE = { swish: 'swish-arcade' };
   UT.scores = {
     list(game) {
-      const l = UT.store.get('hs:' + game, []);
+      const l = UT.store.get('hs:' + (UT.SCORE_TABLE[game] || game), []);
       return Array.isArray(l) ? l : [];
     },
     best(game) {
@@ -37,7 +39,7 @@
       l.push(entry);
       l.sort((a, b) => b.score - a.score || a.t - b.t);
       const top = l.slice(0, 5);
-      UT.store.set('hs:' + game, top);
+      UT.store.set('hs:' + (UT.SCORE_TABLE[game] || game), top);
       return top.indexOf(entry);
     },
   };
