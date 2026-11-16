@@ -181,14 +181,20 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
   position: absolute;
   inset: 0;
   z-index: 10;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   background: rgba(7, 11, 22, 0.72);
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   padding-block: 12px;
 }
 .sheet {
+  /* margin:auto centres the sheet, and if it is ever taller than the screen it starts at the top and scrolls */
+  margin: auto;
+  flex: none;
   width: min(760px, 100%);
   background: var(--night);
   border: 2px solid var(--amber);

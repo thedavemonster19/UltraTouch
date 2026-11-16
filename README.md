@@ -17,7 +17,7 @@ No build step: plain HTML, CSS and JS. Canvas games are drawn at a 540-unit-tall
   - **iOS Safari:** Share → *Add to Home Screen*. It launches without browser chrome. iOS can't lock orientation from the web, so a "turn your phone sideways" card shows in portrait.
   - **Android Chrome:** *Install app* / *Add to Home screen* (fullscreen + landscape from the manifest), or tap **Full screen** on the menu, which also locks landscape.
 - Works offline after the first visit (service worker, hosted copy only).
-- `python3 tools/build_single.py` makes the one-file `dist/ultratouch.html`. Add `--fragment` for the Artifact version.
+- **Release step:** run `python3 tools/build_single.py` (and again with `--fragment` for the Artifact). It stamps every CSS/JS link in `index.html` and the service-worker cache name with a content hash, so phones always load a matching fresh set instead of GitHub Pages' 10-minute cached copy. It also writes the one-file `dist/ultratouch.html`.
 
 ## Sound
 
