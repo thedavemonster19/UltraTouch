@@ -1,7 +1,7 @@
-/* Pair Off — a speed card-clearing game.
- * Mechanics follow the bar-top classic: clear the board by picking two open cards of the same rank or
+/* Pair Off — a speed card-clearing game on a 28-card pyramid.
+ * Mechanics follow the bar-top classic: clear the playfield by picking two open cards of the same rank or
  * next to each other in rank, use the dealt card when nothing on the board matches, and pay points for
- * every extra card you deal. Layout, scoring numbers and art are our own. */
+ * every extra card you deal. Art, scoring numbers and timings are our own. */
 (function () {
   'use strict';
   const UT = window.UT;
@@ -11,12 +11,12 @@
   const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
   const SUITS = ['♠', '♥', '♦', '♣'];
   const RED = [false, true, true, false];
-  const COLS = 8;
-  const DEPTH = 4;
+  const ROWS = 7; /* 1 + 2 + … + 7 = 28 cards */
   const DRAW_COST = 25;
   const HINT_COST = 50;
   const PAIR_BASE = 50;
   const CLEAR_BONUS = 1000;
+  const FLIP_TIME = 0.22;
 
   function shuffled() {
     const d = [];
@@ -48,21 +48,22 @@
     newDeal() {
       this.level++;
       const deck = shuffled();
-      this.cols = [];
-      for (let c = 0; c < COLS; c++) this.cols.push([]);
-      for (let row = 0; row < DEPTH; row++) for (let c = 0; c < COLS; c++) {
-        const card = deck.pop();
-        card.deal = (row * COLS + c) * 0.03;
-        this.cols[c].push(card);
+      /* pyramid slots: row r has r+1 cards; slot (r,i) is covered by (r+1,i) and (r+1,i+1) */
+      this.pyr = [];
+      let n = 0;
+      for (let r = 0; r < ROWS; r++) for (let i = 0; i <= r; i++) {
+        this.pyr.push({ card: deck.pop(), r, i, gone: false, deal: n * 0.035, flipAt: -1 });
+        n++;
       }
       this.stock = deck;
       this.waste = [this.stock.pop()];
-      this.waste[0].deal = COLS * DEPTH * 0.03 + 0.1;
+      this.waste[0].deal = n * 0.035 + 0.1;
       this.sel = null;
       this.combo = 0;
-      this.timeLeft = Math.max(60, 130 - 10 * (this.level - 1));
+      this.timeLeft = Math.max(60, 120 - 10 * (this.level - 1));
       this.state = 'intro';
       this.stateT = 0;
+      this.clock = 0;
       this.flying = [];
       this.shakeT = 0;
       this.shakeIds = [];
@@ -70,48 +71,53 @@
       this.hintT = 0;
       this.lastTick = 11;
       this.reason = '';
+      this.pyr.forEach((s) => (s.wasOpen = this.isOpen(s)));
     }
 
     resize(W, H) {
       this.W = W;
       this.H = H;
-      const cw = Math.round(UT.clamp((W - 152) / 10, 56, 96));
-      const ch = Math.round(cw * 1.4);
-      const step = Math.round(ch * 0.4);
-      const pw = 2 * cw + 36;
-      const x0 = 20 + pw + 16;
-      const gap = Math.max(6, (W - 24 - x0 - COLS * cw) / (COLS - 1));
-      const th = ch + (DEPTH - 1) * step;
-      const ty = Math.max(98, Math.round((H - th) / 2 + 34));
+      /* card height from the screen height (7 rows overlapping by half), width from the screen width */
+      const byH = (H - 104) / 4.05;
+      const byW = ((W - 128) / 9) * 1.4;
+      const ch = Math.round(Math.min(byH, byW, 126));
+      const cw = Math.round(ch / 1.4);
+      const dx = cw + 8;
+      const dy = Math.round(ch * 0.5);
+      const top = 92;
+      const corner = { y: H - ch - 16 };
       this.L = {
-        cw, ch, step, gap, x0, ty,
-        stock: { x: 26, y: ty + 18 },
-        waste: { x: 26 + cw + 14, y: ty + 18 },
-        hint: { x: 26, y: ty + 18 + ch + 30, w: 2 * cw + 14, h: 44 },
+        cw, ch, dx, dy, top,
+        stock: { x: 22, y: corner.y },
+        waste: { x: W - 22 - cw, y: corner.y },
+        hint: { x: W - 22 - cw - 8, y: corner.y - 62, w: cw + 16, h: 44 },
       };
     }
 
-    colX(i) { return this.L.x0 + i * (this.L.cw + this.L.gap); }
-    cardY(row) { return this.L.ty + row * this.L.step; }
+    slotXY(s) {
+      const L = this.L;
+      return { x: this.W / 2 - L.cw / 2 + (s.i - s.r / 2) * L.dx, y: L.top + s.r * L.dy };
+    }
+    slot(r, i) { return this.pyr[(r * (r + 1)) / 2 + i]; }
+    isOpen(s) {
+      if (s.gone) return false;
+      if (s.r === ROWS - 1) return true;
+      return this.slot(s.r + 1, s.i).gone && this.slot(s.r + 1, s.i + 1).gone;
+    }
 
     /* ---------- rules ---------- */
     openRefs() {
       const refs = [];
-      this.cols.forEach((col, i) => { if (col.length) refs.push({ where: 'col', i }); });
+      this.pyr.forEach((s, k) => { if (this.isOpen(s)) refs.push({ where: 'pyr', k }); });
       if (this.waste.length) refs.push({ where: 'waste' });
       return refs;
     }
     cardOf(ref) {
       if (!ref) return null;
-      if (ref.where === 'col') {
-        const col = this.cols[ref.i];
-        return col[col.length - 1] || null;
-      }
-      return this.waste[this.waste.length - 1] || null;
+      return ref.where === 'pyr' ? this.pyr[ref.k].card : this.waste[this.waste.length - 1] || null;
     }
     posOf(ref) {
-      if (ref.where === 'col') return { x: this.colX(ref.i), y: this.cardY(this.cols[ref.i].length - 1) };
-      return { x: this.L.waste.x, y: this.L.waste.y };
+      return ref.where === 'pyr' ? this.slotXY(this.pyr[ref.k]) : { x: this.L.waste.x, y: this.L.waste.y };
     }
     findPair() {
       const refs = this.openRefs();
@@ -120,11 +126,27 @@
       }
       return null;
     }
-    sameRef(a, b) { return a && b && a.where === b.where && (a.where === 'waste' || a.i === b.i); }
+    sameRef(a, b) { return !!(a && b && a.where === b.where && (a.where === 'waste' || a.k === b.k)); }
+    remaining() { return this.pyr.reduce((n, s) => n + (s.gone ? 0 : 1), 0); }
 
     take(ref) {
-      const card = ref.where === 'col' ? this.cols[ref.i].pop() : this.waste.pop();
-      return card;
+      if (ref.where === 'pyr') {
+        this.pyr[ref.k].gone = true;
+        return this.pyr[ref.k].card;
+      }
+      return this.waste.pop();
+    }
+
+    /* newly uncovered cards flip face up */
+    flipNewlyOpen() {
+      this.pyr.forEach((s) => {
+        const open = this.isOpen(s);
+        if (open && !s.wasOpen) {
+          s.flipAt = this.clock;
+          UT.sfx.deal();
+        }
+        s.wasOpen = open;
+      });
     }
 
     tryPair(a, b) {
@@ -140,37 +162,31 @@
       }
       const pa = this.posOf(a);
       const pb = this.posOf(b);
-      /* take the column card first so a waste ref stays valid */
-      const first = a.where === 'col' ? a : b;
-      const second = first === a ? b : a;
-      const c1 = this.take(first);
-      const c2 = this.take(second);
-      const p1 = first === a ? pa : pb;
-      const p2 = first === a ? pb : pa;
-      this.flying.push({ card: c1, x: p1.x, y: p1.y, t: 0, dir: -1 });
-      this.flying.push({ card: c2, x: p2.x, y: p2.y, t: 0, dir: 1 });
+      this.take(a);
+      this.take(b);
+      this.flying.push({ card: ca, x: pa.x, y: pa.y, t: 0, dir: -1 });
+      this.flying.push({ card: cb, x: pb.x, y: pb.y, t: 0, dir: 1 });
       this.combo++;
       this.totalPairs++;
       const pts = PAIR_BASE * Math.min(this.combo, 10);
       this.score += pts;
-      const mx = (pa.x + pb.x) / 2 + this.L.cw / 2;
-      const my = Math.min(pa.y, pb.y);
-      this.popups.add('+' + pts + (this.combo > 1 ? '  ×' + Math.min(this.combo, 10) : ''), mx, my, this.combo >= 5 ? C.mint : C.amber, 26);
+      this.popups.add('+' + pts + (this.combo > 1 ? '  ×' + Math.min(this.combo, 10) : ''), (pa.x + pb.x) / 2 + this.L.cw / 2, Math.min(pa.y, pb.y), this.combo >= 5 ? C.mint : C.amber, 26);
       UT.sfx.match(this.combo);
       this.sel = null;
       this.hint = null;
+      this.flipNewlyOpen();
       this.afterMove();
     }
 
     dealOne() {
       if (!this.stock.length) {
         UT.sfx.nope();
-        this.popups.add('DECK EMPTY', this.L.stock.x + this.L.cw / 2, this.L.stock.y, C.coral, 20);
+        this.popups.add('DECK EMPTY', this.L.stock.x + this.L.cw / 2, this.L.stock.y - 10, C.coral, 20);
         return;
       }
       const card = this.stock.pop();
       card.deal = 0;
-      card.dealFrom = performance.now();
+      card.dealFrom = this.clock;
       this.waste.push(card);
       this.score = Math.max(0, this.score - DRAW_COST);
       this.combo = 0;
@@ -195,7 +211,7 @@
     }
 
     afterMove() {
-      if (this.cols.every((c) => !c.length)) {
+      if (!this.remaining()) {
         const secs = Math.floor(this.timeLeft);
         this.bonus = { base: CLEAR_BONUS, time: secs * 10, deck: this.stock.length * 100 };
         this.score += this.bonus.base + this.bonus.time + this.bonus.deck;
@@ -216,7 +232,7 @@
     }
 
     /* ---------- input ---------- */
-    hitCard(x, y, cx, cy) { return x >= cx && x <= cx + this.L.cw && y >= cy && y <= cy + this.L.ch; }
+    hitCard(x, y, cx, cy, h) { return x >= cx && x <= cx + this.L.cw && y >= cy && y <= cy + (h || this.L.ch); }
 
     onDown(x, y) {
       const L = this.L;
@@ -243,11 +259,12 @@
 
       let ref = null;
       if (this.waste.length && this.hitCard(x, y, L.waste.x, L.waste.y)) ref = { where: 'waste' };
-      for (let i = 0; i < COLS && !ref; i++) {
-        const n = this.cols[i].length;
-        if (!n) continue;
-        /* the whole top card is the target, plus a little slack above it */
-        if (this.hitCard(x, y + 10, this.colX(i), this.cardY(n - 1)) || this.hitCard(x, y, this.colX(i), this.cardY(n - 1))) ref = { where: 'col', i };
+      /* open cards: test the full card face (nothing covers an open card) */
+      for (let k = this.pyr.length - 1; k >= 0 && !ref; k--) {
+        const s = this.pyr[k];
+        if (!this.isOpen(s)) continue;
+        const p = this.slotXY(s);
+        if (this.hitCard(x, y, p.x - 3, p.y - 3, L.ch + 6)) ref = { where: 'pyr', k };
       }
       if (!ref) {
         this.sel = null;
@@ -271,6 +288,7 @@
 
     /* ---------- loop ---------- */
     update(dt) {
+      this.clock += dt;
       this.stateT += dt;
       this.popups.update(dt);
       this.shakeT = Math.max(0, this.shakeT - dt);
@@ -278,7 +296,7 @@
       if (!this.hintT) this.hint = null;
       this.flying.forEach((f) => (f.t += dt));
       this.flying = this.flying.filter((f) => f.t < 0.5);
-      if (this.state === 'dealing' && this.stateT > COLS * DEPTH * 0.03 + 0.45) {
+      if (this.state === 'dealing' && this.stateT > this.pyr.length * 0.035 + 0.45) {
         this.state = 'play';
         this.stateT = 0;
         if (!this.findPair() && !this.stock.length) this.over('No pairs on the deal');
@@ -303,13 +321,12 @@
       const W = this.W;
       const H = this.H;
       const L = this.L;
-      /* felt */
-      const bg = g.createRadialGradient(W * 0.55, H * 0.55, 60, W * 0.55, H * 0.55, W * 0.75);
-      bg.addColorStop(0, '#17614f');
+      const bg = g.createRadialGradient(W / 2, H * 0.5, 60, W / 2, H * 0.5, W * 0.7);
+      bg.addColorStop(0, '#1a6a55');
       bg.addColorStop(1, '#0a2c2a');
       g.fillStyle = bg;
       g.fillRect(0, 0, W, H);
-      g.strokeStyle = 'rgba(255,255,255,0.05)';
+      g.strokeStyle = 'rgba(255,255,255,0.045)';
       g.lineWidth = 1;
       for (let i = -H; i < W; i += 18) {
         g.beginPath();
@@ -317,77 +334,74 @@
         g.lineTo(i + H, 0);
         g.stroke();
       }
-      /* side rail */
-      g.fillStyle = 'rgba(7,20,20,0.55)';
-      D.rrect(g, 12, L.ty - 14, 2 * L.cw + 42, L.ch + 120, 16);
-      g.fill();
-
-      /* empty column slots */
-      for (let i = 0; i < COLS; i++) {
-        g.strokeStyle = 'rgba(255,255,255,0.12)';
-        g.lineWidth = 2;
-        D.rrect(g, this.colX(i), L.ty, L.cw, L.ch, L.cw * 0.09);
-        g.stroke();
-      }
 
       const dealing = this.state === 'dealing' || this.state === 'intro';
       const dealT = this.state === 'dealing' ? this.stateT : this.state === 'intro' ? -1 : 99;
-      const isHint = (ref) => this.hint && this.hint.some((h) => this.sameRef(h, ref));
+      const isHint = (ref) => !!(this.hint && this.hint.some((h) => this.sameRef(h, ref)));
       const isSel = (ref) => this.sameRef(this.sel, ref);
 
-      /* tableau */
-      this.cols.forEach((col, i) => {
-        col.forEach((card, row) => {
-          let x = this.colX(i);
-          let y = this.cardY(row);
-          if (dealing) {
-            const k = UT.ease((dealT - card.deal) / 0.25);
-            if (dealT < card.deal) return;
-            x = UT.lerp(L.stock.x, x, k);
-            y = UT.lerp(L.stock.y, y, k);
-          }
-          const top = row === col.length - 1;
-          const ref = { where: 'col', i };
-          this.drawCard(g, card, x, y, {
-            dim: !top,
-            selected: top && isSel(ref),
-            hint: top && isHint(ref),
-          });
-        });
+      /* pyramid, back rows first so lower rows overlap them */
+      this.pyr.forEach((s, k) => {
+        if (s.gone) return;
+        let { x, y } = this.slotXY(s);
+        if (dealing) {
+          if (dealT < s.deal) return;
+          const e = UT.ease((dealT - s.deal) / 0.25);
+          x = UT.lerp(L.stock.x, x, e);
+          y = UT.lerp(L.stock.y, y, e);
+        }
+        const open = this.isOpen(s);
+        const ref = { where: 'pyr', k };
+        if (!open) {
+          this.drawBack(g, x, y);
+          return;
+        }
+        /* flip: squash the back to nothing, then grow the face */
+        const ft = s.flipAt >= 0 ? (this.clock - s.flipAt) / FLIP_TIME : 1;
+        if (ft < 1) {
+          const half = ft < 0.5;
+          const sx = Math.abs(1 - ft * 2);
+          g.save();
+          g.translate(x + L.cw / 2, 0);
+          g.scale(Math.max(0.02, sx), 1);
+          g.translate(-(x + L.cw / 2), 0);
+          if (half) this.drawBack(g, x, y);
+          else this.drawCard(g, s.card, x, y, {});
+          g.restore();
+          return;
+        }
+        this.drawCard(g, s.card, x, y, { selected: isSel(ref), hint: isHint(ref) });
       });
 
-      /* stock */
+      /* deck, bottom left */
+      D.text(g, 'DECK  −' + DRAW_COST, L.stock.x + L.cw / 2, L.stock.y - 12, 11, C.dim, { weight: 700 });
       if (this.stock.length) {
-        for (let k = Math.min(3, this.stock.length) - 1; k >= 0; k--) this.drawBack(g, L.stock.x - k * 2, L.stock.y - k * 2);
+        for (let k = Math.min(3, this.stock.length) - 1; k >= 0; k--) this.drawBack(g, L.stock.x + k * 2, L.stock.y - k * 2);
         g.fillStyle = 'rgba(7,11,22,0.8)';
         D.rrect(g, L.stock.x + L.cw / 2 - 20, L.stock.y + L.ch - 30, 40, 22, 11);
         g.fill();
         D.text(g, String(this.stock.length), L.stock.x + L.cw / 2, L.stock.y + L.ch - 19, 13, C.text, { weight: 800 });
       } else {
-        g.strokeStyle = 'rgba(255,255,255,0.18)';
+        g.strokeStyle = 'rgba(255,255,255,0.2)';
         g.setLineDash([6, 6]);
         D.rrect(g, L.stock.x, L.stock.y, L.cw, L.ch, L.cw * 0.09);
         g.stroke();
         g.setLineDash([]);
         D.text(g, 'EMPTY', L.stock.x + L.cw / 2, L.stock.y + L.ch / 2, 12, 'rgba(255,255,255,0.4)', { weight: 700 });
       }
-      D.text(g, 'DEAL  −' + DRAW_COST, L.stock.x + L.cw / 2, L.stock.y - 12, 11, C.dim, { weight: 700 });
-      D.text(g, 'IN PLAY', L.waste.x + L.cw / 2, L.waste.y - 12, 11, C.dim, { weight: 700 });
 
-      /* waste: the dealt card(s) */
+      /* dealt card, bottom right */
+      D.text(g, 'DEALT CARD', L.waste.x + L.cw / 2, L.waste.y - 12, 11, C.dim, { weight: 700 });
       if (!(dealing && dealT < (this.waste[0] ? this.waste[0].deal : 0))) {
         const n = this.waste.length;
         for (let k = Math.max(0, n - 3); k < n; k++) {
           const card = this.waste[k];
           const off = (n - 1 - k) * 3;
           let x = L.waste.x - off;
-          let y = L.waste.y - off;
-          if (card.dealFrom) {
-            const kk = UT.ease((performance.now() - card.dealFrom) / 200);
-            x = UT.lerp(L.stock.x, x, kk);
-          }
+          const y = L.waste.y - off;
+          if (card.dealFrom != null) x = UT.lerp(L.stock.x, x, UT.ease((this.clock - card.dealFrom) / 0.22));
           const top = k === n - 1;
-          this.drawCard(g, card, x, y, { selected: top && isSel({ where: 'waste' }), hint: top && isHint({ where: 'waste' }), dim: !top });
+          this.drawCard(g, card, x, y, { selected: top && isSel({ where: 'waste' }), hint: top && isHint({ where: 'waste' }) });
         }
         if (n > 1) {
           g.fillStyle = C.coral;
@@ -398,7 +412,7 @@
         }
       }
 
-      /* hint button */
+      /* hint, above the dealt card */
       const hb = L.hint;
       g.fillStyle = 'rgba(255,255,255,0.08)';
       D.rrect(g, hb.x, hb.y, hb.w, hb.h, 12);
@@ -406,16 +420,13 @@
       g.strokeStyle = 'rgba(88,180,255,0.6)';
       g.lineWidth = 1.5;
       g.stroke();
-      D.text(g, 'HINT  −' + HINT_COST, hb.x + hb.w / 2, hb.y + hb.h / 2 + 1, 14, C.sky, { weight: 800 });
+      D.text(g, 'HINT −' + HINT_COST, hb.x + hb.w / 2, hb.y + hb.h / 2 + 1, 13, C.sky, { weight: 800 });
 
-      /* matched cards flying off */
       this.flying.forEach((f) => {
         const k = f.t / 0.5;
         g.save();
         g.globalAlpha = 1 - k;
-        const x = f.x + f.dir * k * 60;
-        const y = f.y - k * 140;
-        g.translate(x + L.cw / 2, y + L.ch / 2);
+        g.translate(f.x + f.dir * k * 60 + L.cw / 2, f.y - k * 140 + L.ch / 2);
         g.rotate(f.dir * k * 0.6);
         g.scale(1 - k * 0.3, 1 - k * 0.3);
         this.drawCard(g, f.card, -L.cw / 2, -L.ch / 2, {});
@@ -455,18 +466,10 @@
       g.stroke();
       const col = RED[card.s] ? '#d23440' : '#1b1f2e';
       const rank = RANKS[card.r];
-      const rs = Math.round(w * (rank === '10' ? 0.24 : 0.27));
-      D.text(g, rank, x + w * 0.08, y + w * 0.2, rs, col, { align: 'left', weight: 800 });
+      D.text(g, rank, x + w * 0.08, y + w * 0.2, Math.round(w * (rank === '10' ? 0.24 : 0.28)), col, { align: 'left', weight: 800 });
       D.text(g, SUITS[card.s], x + w * 0.92, y + w * 0.2, Math.round(w * 0.24), col, { align: 'right', weight: 400, family: 'system-ui, sans-serif' });
       D.text(g, SUITS[card.s], x + w / 2, y + h * 0.6, Math.round(w * 0.55), col, { weight: 400, family: 'system-ui, sans-serif' });
-      if (card.r >= 10 || card.r === 0) {
-        D.text(g, rank, x + w / 2, y + h * 0.6, Math.round(w * 0.2), '#fbf7ee', { weight: 800 });
-      }
-      if (o.dim) {
-        g.fillStyle = 'rgba(10,30,30,0.16)';
-        D.rrect(g, x, y, w, h, rad);
-        g.fill();
-      }
+      if (card.r >= 10 || card.r === 0) D.text(g, rank, x + w / 2, y + h * 0.6, Math.round(w * 0.2), '#fbf7ee', { weight: 800 });
     }
 
     drawBack(g, x, y) {
@@ -480,8 +483,12 @@
       D.rrect(g, x, y, w, h, rad);
       g.fill();
       g.restore();
+      g.strokeStyle = 'rgba(0,0,0,0.25)';
+      g.lineWidth = 1;
+      D.rrect(g, x, y, w, h, rad);
+      g.stroke();
       g.save();
-      D.rrect(g, x + 5, y + 5, w - 10, h - 10, rad * 0.7);
+      D.rrect(g, x + 4, y + 4, w - 8, h - 8, rad * 0.7);
       g.clip();
       g.fillStyle = '#9c3a4b';
       g.fillRect(x, y, w, h);
@@ -504,24 +511,18 @@
     drawHud(g) {
       const W = this.W;
       g.fillStyle = 'rgba(7,20,20,0.7)';
-      D.rrect(g, 96, 10, 210, 62, 12);
+      D.rrect(g, 96, 10, 200, 62, 12);
       g.fill();
       D.text(g, 'SCORE', 112, 28, 12, C.dim, { align: 'left', weight: 700 });
       D.text(g, this.score.toLocaleString(), 112, 54, 28, C.text, { align: 'left', family: UT.font.display, weight: 400 });
+      /* the timer sits top-right so the pyramid's peak has the middle */
       g.fillStyle = 'rgba(7,20,20,0.7)';
-      D.rrect(g, W / 2 - 80, 10, 160, 62, 12);
+      D.rrect(g, W - 222, 10, 200, 62, 12);
       g.fill();
-      D.text(g, 'DEAL ' + this.level, W / 2, 26, 12, C.dim, { weight: 700 });
       const t = Math.ceil(this.timeLeft);
-      const mm = Math.floor(t / 60);
-      const ss = String(t % 60).padStart(2, '0');
-      D.text(g, mm + ':' + ss, W / 2, 52, 30, t <= 10 && this.state === 'play' ? C.coral : C.amber, { family: UT.font.display, weight: 400 });
-      g.fillStyle = 'rgba(7,20,20,0.7)';
-      D.rrect(g, W - 250, 10, 226, 62, 12);
-      g.fill();
-      const left = this.cols.reduce((n, c) => n + c.length, 0);
-      D.text(g, left + ' CARDS LEFT', W - 236, 30, 15, C.text, { align: 'left', weight: 800 });
-      D.text(g, this.combo > 1 ? 'COMBO ×' + Math.min(this.combo, 10) : 'Pair same rank or ±1', W - 236, 54, 12, this.combo > 1 ? C.mint : C.dim, { align: 'left', weight: 700 });
+      D.text(g, 'DEAL ' + this.level + ' · ' + this.remaining() + ' LEFT', W - 208, 28, 12, C.dim, { align: 'left', weight: 700 });
+      D.text(g, Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'), W - 208, 54, 28, t <= 10 && this.state === 'play' ? C.coral : C.amber, { align: 'left', family: UT.font.display, weight: 400 });
+      if (this.combo > 1) D.text(g, '×' + Math.min(this.combo, 10), W - 40, 54, 18, C.mint, { align: 'right', family: UT.font.display, weight: 400 });
     }
 
     panel(g, w, h) {
@@ -539,12 +540,12 @@
     }
 
     drawIntro(g) {
-      const { y } = this.panel(g, 470, 240);
+      const { y } = this.panel(g, 480, 240);
       const cx = this.W / 2;
       D.text(g, 'DEAL ' + this.level, cx, y + 50, 40, C.text, { family: UT.font.display, weight: 400 });
-      D.text(g, 'Clear all ' + COLS * DEPTH + ' cards in ' + Math.floor(this.timeLeft) + ' seconds', cx, y + 94, 18, C.text, { weight: 600 });
+      D.text(g, 'Clear the 28-card pyramid in ' + Math.floor(this.timeLeft) + ' seconds', cx, y + 94, 18, C.text, { weight: 600 });
       D.text(g, 'Tap two open cards of the same rank or one apart (7-8, K-A)', cx, y + 126, 14, C.dim, { weight: 500 });
-      D.text(g, 'The dealt card counts. Stuck? Deal another for −' + DRAW_COST, cx, y + 148, 14, C.dim, { weight: 500 });
+      D.text(g, 'The dealt card counts. Stuck? Tap the deck for a new one (−' + DRAW_COST + ')', cx, y + 148, 14, C.dim, { weight: 500 });
       D.text(g, 'Chain pairs without dealing to build a combo', cx, y + 170, 14, C.dim, { weight: 500 });
       if (this.stateT > 0.3) D.text(g, 'TAP TO DEAL', cx, y + 212, 16, C.amber, { weight: 800 });
     }
@@ -553,7 +554,7 @@
       const { y } = this.panel(g, 440, 240);
       const cx = this.W / 2;
       const b = this.bonus;
-      D.text(g, 'BOARD CLEARED', cx, y + 46, 32, C.mint, { family: UT.font.display, weight: 400 });
+      D.text(g, 'PYRAMID CLEARED', cx, y + 46, 30, C.mint, { family: UT.font.display, weight: 400 });
       D.text(g, 'Clear bonus  +' + b.base.toLocaleString(), cx, y + 92, 16, C.text, { weight: 600 });
       D.text(g, 'Time left  +' + b.time.toLocaleString(), cx, y + 116, 16, C.text, { weight: 600 });
       D.text(g, 'Cards still in the deck  +' + b.deck.toLocaleString(), cx, y + 140, 16, C.text, { weight: 600 });

@@ -170,7 +170,7 @@
     if (r.game === 'swish') {
       const sorted = r.players.slice().sort((a, b) => b.score - a.score);
       r.players.forEach((p) => {
-        const label = r.players.length > 1 ? p.name : r.allClear ? 'All 4 rounds' : 'Round ' + Math.min(p.rounds + 1, 4);
+        const label = r.players.length > 1 ? p.name : p.rounds === r.rounds ? 'All ' + r.rounds + ' rounds' : 'Round ' + Math.min(p.rounds + 1, r.rounds);
         const rank = UT.scores.add('swish', p.score, label);
         if (rank >= 0) ranks.push(rank);
       });
@@ -178,7 +178,7 @@
         const p = r.players[0];
         const pct = p.shots ? Math.round((p.made / p.shots) * 100) : 0;
         body += '<div class="big-score">' + p.score.toLocaleString() + '</div>';
-        body += '<p class="note">' + p.made + ' of ' + p.shots + ' shots (' + pct + '%) · ' + (p.rounds === 4 ? 'cleared all 4 rounds' : 'reached round ' + Math.min(p.rounds + 1, 4)) + '</p>';
+        body += '<p class="note">' + p.made + ' of ' + p.shots + ' shots (' + pct + '%) · ' + (p.rounds === r.rounds ? 'cleared all ' + r.rounds + ' rounds' : 'reached round ' + Math.min(p.rounds + 1, r.rounds)) + '</p>';
       } else {
         body += '<p class="note">' + esc(sorted[0].name) + ' wins</p><div class="scores">';
         sorted.forEach((p, i) => {
