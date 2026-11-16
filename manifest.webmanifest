@@ -1,11 +1,11 @@
 {
   "name": "UltraTouch Arcade",
   "short_name": "UltraTouch",
-  "description": "Swish Shot and Pair Off: bar-top style touch games for phones held sideways.",
+  "description": "Swish Shot and Pair Off: bar-top style touch games for phones.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
-  "orientation": "landscape",
+  "orientation": "any",
   "background_color": "#0d1321",
   "theme_color": "#0d1321",
   "icons": [

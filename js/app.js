@@ -26,7 +26,7 @@
     fitHub();
     fitSheet();
   }
-  /* shrink the whole menu to fit the visible height in landscape, so nothing hides under the toolbar */
+  /* shrink the whole menu to fit the visible height (either orientation), so nothing hides under the toolbar */
   const hubInner = document.querySelector('.hub-inner');
   function fitHub() {
     if (hub.hidden) return;
@@ -36,7 +36,7 @@
     const cs = getComputedStyle(hub);
     const availH = hub.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
     const availW = hub.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-    if (hub.clientWidth <= 640 || hubInner.offsetHeight <= availH) return;
+    if (hubInner.offsetHeight <= availH) return;
     /* widening the content (so it still fills the width once scaled) changes its height, so settle in a few passes */
     let s = 1;
     for (let i = 0; i < 4; i++) {
@@ -104,7 +104,7 @@
   });
   syncSound();
 
-  /* ---------- fullscreen + landscape lock (Android/desktop; iOS uses Add to Home Screen) ---------- */
+  /* ---------- fullscreen (Android/desktop; iOS uses Add to Home Screen) ---------- */
   const root = document.documentElement;
   const canFs = !!(root.requestFullscreen || root.webkitRequestFullscreen);
   const standalone = window.matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches || navigator.standalone;
@@ -119,9 +119,7 @@
   function goFullscreen() {
     try {
       const p = root.requestFullscreen ? root.requestFullscreen({ navigationUI: 'hide' }) : root.webkitRequestFullscreen();
-      Promise.resolve(p)
-        .then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape'))
-        .catch(() => {});
+      Promise.resolve(p).catch(() => {});
     } catch (e) { /* not allowed here; keep playing windowed */ }
   }
   fsBtn.addEventListener('click', () => {
@@ -129,9 +127,6 @@
     goFullscreen();
   });
 
-  const rotate = $('#rotate');
-  rotate.hidden = false;
-  $('#btn-rotate-anyway').addEventListener('click', () => rotate.classList.add('dismissed'));
 
   /* ---------- game lifecycle ---------- */
   function start(game) {

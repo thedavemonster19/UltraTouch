@@ -1,6 +1,6 @@
 # UltraTouch
 
-Two bar-top style touch games rebuilt for a **phone held sideways** (Android and iOS browsers):
+Two bar-top style touch games rebuilt for phone browsers (Android and iOS), playable held either way. Landscape gives the biggest picture:
 
 | Game | Inspired by | What you do |
 |---|---|---|
@@ -14,8 +14,8 @@ No build step: plain HTML, CSS and JS. Canvas games are drawn at a 540-unit-tall
 - **Local:** `python3 -m http.server` in this folder, then open `http://localhost:8000` (or open `dist/ultratouch.html` directly).
 - **Live site (GitHub Pages):** https://thedavemonster19.github.io/UltraTouch/ (Settings → Pages → Deploy from a branch → `main` / root). Send that link to friends.
 - **Phone, full screen:** open the site on the phone, then
-  - **iOS Safari:** Share → *Add to Home Screen*. It launches without browser chrome. iOS can't lock orientation from the web, so a "turn your phone sideways" card shows in portrait.
-  - **Android Chrome:** *Install app* / *Add to Home screen* (fullscreen + landscape from the manifest), or tap **Full screen** on the menu, which also locks landscape.
+  - **iOS Safari:** Share → *Add to Home Screen*. It launches without browser chrome.
+  - **Android Chrome:** *Install app* / *Add to Home screen* (fullscreen from the manifest), or tap **Full screen** on the menu.
 - Works offline after the first visit (service worker, hosted copy only).
 - **Release step:** run `python3 tools/build_single.py` (and again with `--fragment` for the Artifact). It stamps every CSS/JS link in `index.html` and the service-worker cache name with a content hash, so phones always load a matching fresh set instead of GitHub Pages' 10-minute cached copy. It also writes the one-file `dist/ultratouch.html`.
 
@@ -27,12 +27,12 @@ All sound is synthesized live with Web Audio (no files). Swish Shot: shot whoosh
 
 ```
 index.html            menu + game shell
-css/style.css         hub, sheets, portrait notice
+css/style.css         hub, sheets
 js/core.js            storage, high scores, Web Audio synth, canvas Stage, helpers
 js/swish.js           Swish Shot
 js/pairoff.js         Pair Off
 js/app.js             menu, pause/results, fullscreen, service worker
-manifest.webmanifest  PWA (fullscreen, landscape)
+manifest.webmanifest  PWA (fullscreen, any orientation)
 sw.js                 offline cache (bump VERSION on release)
 icons/                generated PNG icons
 tools/build_single.py one-file bundle

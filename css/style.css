@@ -230,28 +230,6 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 }
 .sheet-actions button.primary { background: var(--amber); border-color: var(--amber); color: var(--ink); }
 
-/* ---------- portrait notice ---------- */
-#rotate {
-  position: absolute;
-  inset: 0;
-  z-index: 20;
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  text-align: center;
-  background: var(--ink);
-  padding-inline: 24px;
-}
-#rotate svg { width: 72px; height: 72px; fill: none; stroke: var(--amber); stroke-width: 3; stroke-linecap: round; animation: tilt 2.4s ease-in-out infinite; }
-#rotate p { margin: 0; font-family: var(--font-display); font-size: 22px; }
-#rotate small { color: var(--dim); }
-@media (orientation: portrait) {
-  #rotate:not(.dismissed) { display: flex; }
-}
-@keyframes tilt { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
-@media (prefers-reduced-motion: reduce) { #rotate svg { animation: none; } }
 
 /* short landscape phones: tighten the hub */
 @media (max-height: 430px) {
@@ -262,8 +240,12 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 }
 /* narrow (portrait or small windows) — stack, scrollable */
 @media (max-width: 640px) {
-  #hub { align-items: flex-start; }
+  #hub { align-items: center; }
   .hub-inner { grid-template-columns: 1fr; }
   .tiles { grid-template-columns: 1fr; }
   .split { grid-template-columns: 1fr; }
+  /* portrait phones: shorter art and tighter copy so the menu fits on one screen */
+  .art { max-height: 15vh; object-fit: cover; }
+  .tile svg.art { height: 15vh; }
+  .install { display: none; }
 }

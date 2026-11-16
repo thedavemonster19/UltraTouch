@@ -244,28 +244,6 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 }
 .sheet-actions button.primary { background: var(--amber); border-color: var(--amber); color: var(--ink); }
 
-/* ---------- portrait notice ---------- */
-#rotate {
-  position: absolute;
-  inset: 0;
-  z-index: 20;
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  text-align: center;
-  background: var(--ink);
-  padding-inline: 24px;
-}
-#rotate svg { width: 72px; height: 72px; fill: none; stroke: var(--amber); stroke-width: 3; stroke-linecap: round; animation: tilt 2.4s ease-in-out infinite; }
-#rotate p { margin: 0; font-family: var(--font-display); font-size: 22px; }
-#rotate small { color: var(--dim); }
-@media (orientation: portrait) {
-  #rotate:not(.dismissed) { display: flex; }
-}
-@keyframes tilt { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
-@media (prefers-reduced-motion: reduce) { #rotate svg { animation: none; } }
 
 /* short landscape phones: tighten the hub */
 @media (max-height: 430px) {
@@ -276,10 +254,14 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 }
 /* narrow (portrait or small windows) — stack, scrollable */
 @media (max-width: 640px) {
-  #hub { align-items: flex-start; }
+  #hub { align-items: center; }
   .hub-inner { grid-template-columns: 1fr; }
   .tiles { grid-template-columns: 1fr; }
   .split { grid-template-columns: 1fr; }
+  /* portrait phones: shorter art and tighter copy so the menu fits on one screen */
+  .art { max-height: 15vh; object-fit: cover; }
+  .tile svg.art { height: 15vh; }
+  .install { display: none; }
 }
 </style>
 </head>
@@ -292,7 +274,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
     <section class="brand">
       <p class="eyebrow">Bar-top classics · pocket edition</p>
       <h1 class="marquee">Ultra<span>Touch</span></h1>
-      <p class="lede">Two quick games built for a phone held sideways. Tap fast, chase your best score.</p>
+      <p class="lede">Two quick games for your phone, held either way. Tap fast, chase your best score.</p>
       <div class="brand-actions">
         <button id="btn-fullscreen" class="chip" type="button" hidden>Full screen</button>
         <button id="btn-sound" class="chip" type="button" aria-pressed="true">Sound on</button>
@@ -379,12 +361,6 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
     </div>
   </div>
 
-  <div id="rotate" hidden>
-    <svg viewBox="0 0 64 64" aria-hidden="true"><rect x="20" y="8" width="24" height="44" rx="4"/><path d="M50 40a18 18 0 0 1-18 18M32 58l5-4M32 58l5 4"/></svg>
-    <p>Turn your phone sideways</p>
-    <small>UltraTouch is built for landscape.</small>
-    <button id="btn-rotate-anyway" class="chip" type="button">Play anyway</button>
-  </div>
 </div>
 <script>window.UT_NO_SW = true;</script>
 <script>
@@ -2168,7 +2144,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
     fitHub();
     fitSheet();
   }
-  /* shrink the whole menu to fit the visible height in landscape, so nothing hides under the toolbar */
+  /* shrink the whole menu to fit the visible height (either orientation), so nothing hides under the toolbar */
   const hubInner = document.querySelector('.hub-inner');
   function fitHub() {
     if (hub.hidden) return;
@@ -2178,7 +2154,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
     const cs = getComputedStyle(hub);
     const availH = hub.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
     const availW = hub.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-    if (hub.clientWidth <= 640 || hubInner.offsetHeight <= availH) return;
+    if (hubInner.offsetHeight <= availH) return;
     /* widening the content (so it still fills the width once scaled) changes its height, so settle in a few passes */
     let s = 1;
     for (let i = 0; i < 4; i++) {
@@ -2246,7 +2222,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
   });
   syncSound();
 
-  /* ---------- fullscreen + landscape lock (Android/desktop; iOS uses Add to Home Screen) ---------- */
+  /* ---------- fullscreen (Android/desktop; iOS uses Add to Home Screen) ---------- */
   const root = document.documentElement;
   const canFs = !!(root.requestFullscreen || root.webkitRequestFullscreen);
   const standalone = window.matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches || navigator.standalone;
@@ -2261,9 +2237,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
   function goFullscreen() {
     try {
       const p = root.requestFullscreen ? root.requestFullscreen({ navigationUI: 'hide' }) : root.webkitRequestFullscreen();
-      Promise.resolve(p)
-        .then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape'))
-        .catch(() => {});
+      Promise.resolve(p).catch(() => {});
     } catch (e) { /* not allowed here; keep playing windowed */ }
   }
   fsBtn.addEventListener('click', () => {
@@ -2271,9 +2245,6 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
     goFullscreen();
   });
 
-  const rotate = $('#rotate');
-  rotate.hidden = false;
-  $('#btn-rotate-anyway').addEventListener('click', () => rotate.classList.add('dismissed'));
 
   /* ---------- game lifecycle ---------- */
   function start(game) {
