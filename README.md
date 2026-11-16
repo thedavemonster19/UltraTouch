@@ -5,7 +5,7 @@ Two bar-top style touch games rebuilt for a **phone held sideways** (Android and
 | Game | Inspired by | What you do |
 |---|---|---|
 | **Swish Shot** | *Hoop Jones* (Megatouch) | Five shooters stand in a row. One hoop slides side to side across their lanes. Tap a shooter just before the hoop passes over his lane, so the ball arrives as it crosses. No power meter: it's all timing. 15 balls and 30 s a round, with a basket quota to qualify. The hoop moves back and speeds up over 5 rounds (4.6 → 8.6 m). Three in a row lights **HEAT** (+300, then double points until you miss). 1–4 players pass the phone. |
-| **Pair Off** | *Take 2* (Megatouch) | Clear a 28-card pyramid before the clock runs out. Covered cards are face down and flip up once both cards below them are gone. Tap two open cards of the **same rank or one apart** (K–A wraps). The dealt card (bottom right) counts as open. Tapping the deck (bottom left) deals a new card for 25 points and breaks your combo. Clearing the pyramid earns 1,000 points, +10 a second left and +100 for each card still in the deck. Each deal gets a shorter clock. |
+| **Pair Off** | *Take 2* (Megatouch) | 28 face-up cards in five overlapping brick rows (6-5-6-5-6). A card is open once the cards overlapping it from the row below are gone. Take two open cards: a **pair** (same rank) scores 1,200, a **run** (one up or down, no wrap) scores 400. Tallies for each sit on the left. The dealt card (bottom, next to NEXT CARD) counts as open. Dealing another costs 200. A dot timer runs across the top, and a bonus meter (5,000, draining with the clock) is banked if you clear the board, plus 100 per card left in the deck. TAKE SCORE ends the game and keeps your points. Each deal gets a shorter clock. |
 
 No build step: plain HTML, CSS and JS. Canvas games are drawn at a 540-unit-tall logical resolution whose width follows the screen (letterboxed between 760 and 1240 wide), so they fill everything from 4:3 tablets to 19.5:9 phones. The layout is safe-area aware (notch / Dynamic Island).
 
@@ -56,4 +56,4 @@ This is a sensible precaution, not legal advice. Before selling it or publishing
 ## Tuning knobs
 
 - `ROUNDS` in `js/swish.js`: hoop depth, slide speed, make window (`lat`), quota, points. `BALLS`, `ROUND_TIME`, `GAP` and `RELOAD` sit beside it.
-- Constants at the top of `js/pairoff.js`: pyramid rows, deal cost, hint cost, pair base, clear bonus. The clock is set in `newDeal()`.
+- Constants at the top of `js/pairoff.js`: row sizes, run/pair points, deal cost, bonus size, timer dots. The clock is set in `newDeal()`.

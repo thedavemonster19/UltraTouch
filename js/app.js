@@ -190,7 +190,7 @@
       const rank = UT.scores.add('pairoff', r.score, 'Deal ' + r.level);
       if (rank >= 0) ranks.push(rank);
       body += '<div class="big-score">' + r.score.toLocaleString() + '</div>';
-      body += '<p class="note">' + esc(r.reason) + ' · reached deal ' + r.level + ' · ' + r.pairs + ' pairs</p>';
+      body += '<p class="note">' + esc(r.reason) + ' · reached deal ' + r.level + ' · ' + r.pairs + ' pairs, ' + r.runs + ' runs</p>';
     }
     if (ranks.includes(0)) body = '<p class="center"><span class="badge">NEW BEST</span></p>' + body;
     body += '<p class="note">Top scores on this device</p>' + tableHtml(r.game, ranks);
