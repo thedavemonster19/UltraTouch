@@ -1570,10 +1570,11 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
     }
     return d;
   }
-  /* 'pair' = same rank, 'run' = one apart either way, null = no match */
+  /* 'pair' = same rank, 'run' = one apart either way (K and A wrap round), null = no match */
   function kindOf(a, b) {
     if (a.r === b.r) return 'pair';
-    if (Math.abs(a.r - b.r) === 1) return 'run';
+    const d = Math.abs(a.r - b.r);
+    if (d === 1 || d === 12) return 'run';
     return null;
   }
 
@@ -1605,6 +1606,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       this.stock = deck;
       this.waste = [this.stock.pop()];
       this.waste[0].deal = n * 0.03 + 0.1;
+      this.held = []; /* passed-on cards waiting for a gap in the board */
       this.sel = null;
       this.timeMax = Math.max(60, 120 - 10 * (this.level - 1));
       this.timeLeft = this.timeMax;
@@ -1664,7 +1666,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       return ROW_SIZES[s.r] === 6 ? [this.slotAt(s.r + 1, s.i - 1), this.slotAt(s.r + 1, s.i)].filter(Boolean) : [this.slotAt(s.r + 1, s.i), this.slotAt(s.r + 1, s.i + 1)].filter(Boolean);
     }
     isOpen(s) { return !s.gone && this.coverers(s).every((c) => c.gone); }
-    remaining() { return this.slots.reduce((n, s) => n + (s.gone ? 0 : 1), 0); }
+    remaining() { return this.slots.reduce((n, s) => n + (s.gone ? 0 : 1), 0) + this.held.length; }
 
     openRefs() {
       const refs = [];
@@ -1720,6 +1722,8 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
         this.popups.add('DECK EMPTY', this.L.stock.x + this.L.bcw / 2, this.L.stock.y, C.coral, 20);
         return;
       }
+      /* the dealt card you passed on goes up into the board: first gap from the top row down */
+      if (this.waste.length) this.toBoard(this.waste.pop(), { x: this.L.waste.x, y: this.L.waste.y });
       const card = this.stock.pop();
       card.dealFrom = this.clock;
       this.waste.push(card);
@@ -1730,7 +1734,27 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       this.afterMove();
     }
 
+    toBoard(card, from) {
+      const slot = this.slots.find((s) => s.gone);
+      if (!slot) {
+        this.held.push(card);
+        return;
+      }
+      slot.card = card;
+      slot.gone = false;
+      slot.flyFrom = this.clock;
+      slot.fromXY = from;
+      card.dealFrom = null;
+    }
+
+    /* cards waiting for room drop into the board as soon as a gap opens */
+    fillGaps() {
+      while (this.held.length && this.slots.some((s) => s.gone)) this.toBoard(this.held.shift(), this.heldXY());
+    }
+    heldXY() { return { x: this.L.waste.x + this.L.bcw + 18, y: this.L.waste.y + 10 }; }
+
     afterMove() {
+      this.fillGaps();
       if (!this.remaining()) {
         this.cleared = { bonus: this.bonus, deck: this.stock.length * 100 };
         this.score += this.cleared.bonus + this.cleared.deck;
@@ -1846,6 +1870,11 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       this.slots.forEach((s, k) => {
         if (s.gone) return;
         let { x, y } = this.slotXY(s);
+        if (s.flyFrom != null && this.clock - s.flyFrom < 0.35) {
+          const e = UT.ease((this.clock - s.flyFrom) / 0.35);
+          x = UT.lerp(s.fromXY.x, x, e);
+          y = UT.lerp(s.fromXY.y, y, e);
+        }
         if (dealing) {
           if (dealT < s.deal) return;
           const e = UT.ease((dealT - s.deal) / 0.25);
@@ -1857,7 +1886,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       });
 
       /* bottom bar: deck count, NEXT CARD deck, dealt card */
-      D.text(g, 'CLEAR THE BOARD WITH PAIRS (SAME RANK) OR RUNS (ONE UP OR DOWN)', W / 2, H - L.foot - 4, 11, '#c9b8ff', { weight: 800 });
+      D.text(g, 'CLEAR THE BOARD WITH PAIRS (SAME RANK) OR RUNS (ONE UP OR DOWN, K-A COUNTS)', W / 2, H - L.foot - 4, 11, '#c9b8ff', { weight: 800 });
       g.fillStyle = FIELD;
       D.rrect(g, L.stock.x - 70, L.stock.y - 4, 70 + 2 * L.bcw + 30 + 8, L.bch + 8, 14);
       g.fill();
@@ -1900,6 +1929,12 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
           g.fill();
           D.text(g, String(n), L.waste.x + L.bcw, L.waste.y + 3, 11, '#fff', { weight: 800 });
         }
+      }
+
+      if (this.held.length) {
+        const h = this.heldXY();
+        for (let k = Math.min(3, this.held.length) - 1; k >= 0; k--) this.drawCard(g, this.held[this.held.length - 1 - k], h.x + k * 4, h.y - k * 4, L.bcw * 0.7, L.bch * 0.7, { mini: true, dim: true });
+        D.text(g, 'WAITING ' + this.held.length, h.x + L.bcw * 0.35, h.y - 14, 10, C.dim, { weight: 800 });
       }
 
       this.flying.forEach((f) => {
@@ -2084,9 +2119,9 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       const cx = this.W / 2;
       D.text(g, 'DEAL ' + this.level, cx, y + 46, 38, '#7ff0d0', { family: UT.font.display, weight: 400 });
       D.text(g, 'Clear all 28 cards in ' + this.timeMax + ' seconds', cx, y + 88, 18, C.text, { weight: 600 });
-      D.text(g, 'PAIR = same rank  ×' + PAIR_PTS.toLocaleString() + '     RUN = one up or down  ×' + RUN_PTS, cx, y + 120, 14, C.amber, { weight: 700 });
+      D.text(g, 'PAIR = same rank  ×' + PAIR_PTS.toLocaleString() + '     RUN = one up or down (K-A too)  ×' + RUN_PTS, cx, y + 120, 14, C.amber, { weight: 700 });
       D.text(g, 'Only uncovered cards can be taken. The dealt card counts.', cx, y + 146, 14, C.dim, { weight: 500 });
-      D.text(g, 'NEXT CARD deals another for −' + DEAL_COST + '. Clear the board to bank the bonus.', cx, y + 168, 14, C.dim, { weight: 500 });
+      D.text(g, 'NEXT CARD (−' + DEAL_COST + ') sends the unused card up into the board. Clear it to bank the bonus.', cx, y + 168, 14, C.dim, { weight: 500 });
       D.text(g, 'Stuck? TAKE SCORE ends the game and keeps your points.', cx, y + 190, 14, C.dim, { weight: 500 });
       if (this.stateT > 0.3) D.text(g, 'TAP TO DEAL', cx, y + 226, 16, C.amber, { weight: 800 });
     }
