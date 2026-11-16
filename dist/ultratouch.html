@@ -2064,6 +2064,29 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
   const overlay = $('#overlay');
   const pauseBtn = $('#btn-pause');
   const stage = (UT.stage = new UT.Stage($('#stage')));
+
+  /* Fit the app to the part of the screen you can actually see. Mobile Safari's toolbars overlap the page
+   * (and grow/shrink as you scroll), so the full window height would push the bottom of the game off-screen. */
+  const appEl = $('#app');
+  function fitViewport() {
+    const vv = window.visualViewport;
+    if (vv) {
+      appEl.style.top = vv.offsetTop + 'px';
+      appEl.style.left = vv.offsetLeft + 'px';
+      appEl.style.width = vv.width + 'px';
+      appEl.style.height = vv.height + 'px';
+      appEl.style.right = 'auto';
+      appEl.style.bottom = 'auto';
+    }
+    stage.resize();
+  }
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', fitViewport);
+    window.visualViewport.addEventListener('scroll', fitViewport);
+  }
+  window.addEventListener('orientationchange', () => setTimeout(fitViewport, 350));
+  window.addEventListener('pageshow', fitViewport);
+  fitViewport();
   const NAMES = { swish: 'Swish Shot', pairoff: 'Pair Off' };
   let current = null; /* { game, opts } */
   let swishPlayers = UT.clamp(UT.store.get('swishPlayers', 1), 1, 4);
