@@ -719,11 +719,11 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
   /* z = hoop depth (m, sets its size and height); cross = seconds for the hoop to glide edge to edge;
    * need = baskets out of BALLS to qualify; pts = per basket. */
   const ROUNDS = [
-    { z: 4.6, cross: 3.6, need: 6, pts: 10 },
-    { z: 5.6, cross: 3.1, need: 7, pts: 15 },
-    { z: 6.6, cross: 2.7, need: 7, pts: 20 },
-    { z: 7.6, cross: 2.35, need: 8, pts: 25 },
-    { z: 8.6, cross: 2.05, need: 8, pts: 30 },
+    { z: 4.6, cross: 5.2, need: 6, pts: 10 },
+    { z: 5.6, cross: 4.6, need: 7, pts: 15 },
+    { z: 6.6, cross: 4.1, need: 7, pts: 20 },
+    { z: 7.6, cross: 3.6, need: 8, pts: 25 },
+    { z: 8.6, cross: 3.2, need: 8, pts: 30 },
   ];
   const LANES = 5;
   const BALLS = 15;
@@ -874,7 +874,8 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       g.restore();
     }
 
-    flightTime() { return 0.5 + 0.06 * (this.R.z - SHOOTER_Z); }
+    /* a slow, floaty lob: about 1.1 s to the rim in round 1, 1.4 s by round 5 */
+    flightTime() { return 0.95 + 0.07 * (this.R.z - SHOOTER_Z); }
 
     /* ---------- input ---------- */
     onDown(x) {
@@ -912,7 +913,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       const T = this.flightTime();
       const y0 = 1.62;
       const d = RIM_Y - y0;
-      const h = RIM_Y + 0.42 + 0.03 * r.z - y0;
+      const h = RIM_Y + 0.75 + 0.05 * r.z - y0;
       const b = 2 * h + 2 * Math.sqrt(h * h - h * d);
       const a = d - b;
       this.balls.push({
