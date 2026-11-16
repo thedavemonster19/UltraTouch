@@ -70,10 +70,9 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 #hub {
   position: absolute;
   inset: 0;
-  display: grid;
-  grid-template-columns: minmax(200px, 0.8fr) 2fr;
-  gap: clamp(12px, 2.5vw, 28px);
+  display: flex;
   align-items: center;
+  justify-content: center;
   padding-block: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-bottom, 0px));
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -82,6 +81,16 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
     radial-gradient(ellipse at 20% 0%, rgba(255, 182, 39, 0.14), transparent 55%),
     radial-gradient(ellipse at 90% 100%, rgba(61, 220, 151, 0.1), transparent 50%),
     var(--ink);
+}
+/* the menu content; app.js scales it down as one piece when the visible screen is too short */
+.hub-inner {
+  display: grid;
+  grid-template-columns: minmax(200px, 0.8fr) 2fr;
+  gap: clamp(12px, 2.5vw, 28px);
+  align-items: center;
+  width: 100%;
+  flex: none;
+  transform-origin: center center;
 }
 .brand { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .eyebrow {
@@ -258,7 +267,8 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 }
 /* narrow (portrait or small windows) — stack, scrollable */
 @media (max-width: 640px) {
-  #hub { grid-template-columns: 1fr; align-items: start; }
+  #hub { align-items: flex-start; }
+  .hub-inner { grid-template-columns: 1fr; }
   .tiles { grid-template-columns: 1fr; }
 }
 </style>
@@ -268,6 +278,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
   <canvas id="stage" aria-label="Game screen"></canvas>
 
   <main id="hub">
+    <div class="hub-inner">
     <section class="brand">
       <p class="eyebrow">Bar-top classics · pocket edition</p>
       <h1 class="marquee">Ultra<span>Touch</span></h1>
@@ -297,7 +308,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
         </svg>
         <div class="tile-body">
           <h2>Swish Shot</h2>
-          <p>Five shooters, one sliding hoop. Tap the shooter it's about to pass over. The hoop backs up every round. Three in a row lights the heat.</p>
+          <p>Five shooters, one sliding hoop. Tap the shooter it's about to pass over. The hoop backs up every round. Three in a row brings the lightning.</p>
           <div class="players" role="radiogroup" aria-label="Players">
             <span class="label">Players</span>
             <button type="button" class="pchip" data-p="1" aria-pressed="true">1</button>
@@ -343,6 +354,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
         </div>
       </article>
     </section>
+    </div>
   </main>
 
   <button id="btn-pause" class="icon-btn" type="button" aria-label="Pause" hidden>
@@ -2079,7 +2091,31 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       appEl.style.bottom = 'auto';
     }
     stage.resize();
+    fitHub();
   }
+  /* shrink the whole menu to fit the visible height in landscape, so nothing hides under the toolbar */
+  const hubInner = document.querySelector('.hub-inner');
+  function fitHub() {
+    if (hub.hidden) return;
+    hubInner.style.transform = '';
+    hubInner.style.width = '';
+    hub.style.overflowY = '';
+    const cs = getComputedStyle(hub);
+    const availH = hub.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const availW = hub.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    if (hub.clientWidth <= 640 || hubInner.offsetHeight <= availH) return;
+    /* widening the content (so it still fills the width once scaled) changes its height, so settle in a few passes */
+    let s = 1;
+    for (let i = 0; i < 4; i++) {
+      s = UT.clamp(availH / hubInner.offsetHeight, 0.45, 1);
+      hubInner.style.width = availW / s + 'px';
+    }
+    s = UT.clamp(availH / hubInner.offsetHeight, 0.45, 1);
+    hubInner.style.transform = 'scale(' + s + ')';
+    hub.style.overflowY = 'hidden';
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHub);
+  window.addEventListener('resize', fitHub);
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', fitViewport);
     window.visualViewport.addEventListener('scroll', fitViewport);
@@ -2181,6 +2217,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
     pauseBtn.hidden = true;
     hub.hidden = false;
     refreshBest();
+    fitHub();
   }
 
   /* ---------- sheet ---------- */

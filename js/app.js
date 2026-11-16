@@ -22,7 +22,31 @@
       appEl.style.bottom = 'auto';
     }
     stage.resize();
+    fitHub();
   }
+  /* shrink the whole menu to fit the visible height in landscape, so nothing hides under the toolbar */
+  const hubInner = document.querySelector('.hub-inner');
+  function fitHub() {
+    if (hub.hidden) return;
+    hubInner.style.transform = '';
+    hubInner.style.width = '';
+    hub.style.overflowY = '';
+    const cs = getComputedStyle(hub);
+    const availH = hub.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const availW = hub.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    if (hub.clientWidth <= 640 || hubInner.offsetHeight <= availH) return;
+    /* widening the content (so it still fills the width once scaled) changes its height, so settle in a few passes */
+    let s = 1;
+    for (let i = 0; i < 4; i++) {
+      s = UT.clamp(availH / hubInner.offsetHeight, 0.45, 1);
+      hubInner.style.width = availW / s + 'px';
+    }
+    s = UT.clamp(availH / hubInner.offsetHeight, 0.45, 1);
+    hubInner.style.transform = 'scale(' + s + ')';
+    hub.style.overflowY = 'hidden';
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHub);
+  window.addEventListener('resize', fitHub);
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', fitViewport);
     window.visualViewport.addEventListener('scroll', fitViewport);
@@ -124,6 +148,7 @@
     pauseBtn.hidden = true;
     hub.hidden = false;
     refreshBest();
+    fitHub();
   }
 
   /* ---------- sheet ---------- */

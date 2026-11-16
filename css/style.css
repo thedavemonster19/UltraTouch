@@ -56,10 +56,9 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 #hub {
   position: absolute;
   inset: 0;
-  display: grid;
-  grid-template-columns: minmax(200px, 0.8fr) 2fr;
-  gap: clamp(12px, 2.5vw, 28px);
+  display: flex;
   align-items: center;
+  justify-content: center;
   padding-block: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-bottom, 0px));
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -68,6 +67,16 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
     radial-gradient(ellipse at 20% 0%, rgba(255, 182, 39, 0.14), transparent 55%),
     radial-gradient(ellipse at 90% 100%, rgba(61, 220, 151, 0.1), transparent 50%),
     var(--ink);
+}
+/* the menu content; app.js scales it down as one piece when the visible screen is too short */
+.hub-inner {
+  display: grid;
+  grid-template-columns: minmax(200px, 0.8fr) 2fr;
+  gap: clamp(12px, 2.5vw, 28px);
+  align-items: center;
+  width: 100%;
+  flex: none;
+  transform-origin: center center;
 }
 .brand { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .eyebrow {
@@ -244,6 +253,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 }
 /* narrow (portrait or small windows) — stack, scrollable */
 @media (max-width: 640px) {
-  #hub { grid-template-columns: 1fr; align-items: start; }
+  #hub { align-items: flex-start; }
+  .hub-inner { grid-template-columns: 1fr; }
   .tiles { grid-template-columns: 1fr; }
 }
