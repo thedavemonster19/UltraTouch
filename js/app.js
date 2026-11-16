@@ -134,8 +134,9 @@
     hub.hidden = true;
     pauseBtn.hidden = false;
     current = { game };
+    const onRecord = (result) => record(result);
     const onEnd = (result) => setTimeout(() => results(result), 50);
-    const make = () => (game === 'swish' ? new UT.Swish({ players: swishPlayers, onEnd }) : new UT.PairOff({ onEnd }));
+    const make = () => (game === 'swish' ? new UT.Swish({ players: swishPlayers, onEnd, onRecord }) : new UT.PairOff({ onEnd, onRecord }));
     const fontsReady = document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 1200))]) : Promise.resolve();
     fontsReady.then(() => stage.run(make()));
   }
@@ -218,19 +219,33 @@
     );
   }
 
-  function results(r) {
-    if (!current) return;
-    stage.paused = true;
-    pauseBtn.hidden = true;
-    let body = '';
+  /* add a finished game to the high scores exactly once; returns the table ranks it earned */
+  function record(r) {
+    if (r.ranks) return r.ranks;
     const ranks = [];
     if (r.game === 'swish') {
-      const sorted = r.players.slice().sort((a, b) => b.score - a.score);
       r.players.forEach((p) => {
         const label = r.players.length > 1 ? p.name : p.rounds === r.rounds ? 'All ' + r.rounds + ' rounds' : 'Round ' + Math.min(p.rounds + 1, r.rounds);
         const rank = UT.scores.add('swish', p.score, label);
         if (rank >= 0) ranks.push(rank);
       });
+    } else {
+      const rank = UT.scores.add('pairoff', r.score, 'Deal ' + r.level);
+      if (rank >= 0) ranks.push(rank);
+    }
+    r.ranks = ranks;
+    refreshBest();
+    return ranks;
+  }
+
+  function results(r) {
+    if (!current) return;
+    stage.paused = true;
+    pauseBtn.hidden = true;
+    let body = '';
+    const ranks = record(r);
+    if (r.game === 'swish') {
+      const sorted = r.players.slice().sort((a, b) => b.score - a.score);
       if (r.players.length === 1) {
         const p = r.players[0];
         const pct = p.shots ? Math.round((p.made / p.shots) * 100) : 0;
@@ -244,8 +259,6 @@
         body += '</div>';
       }
     } else {
-      const rank = UT.scores.add('pairoff', r.score, 'Deal ' + r.level);
-      if (rank >= 0) ranks.push(rank);
       body += '<div class="big-score">' + r.score.toLocaleString() + '</div>';
       body += '<p class="note">' + esc(r.reason) + ' · reached deal ' + r.level + ' · ' + r.pairs + ' pairs, ' + r.runs + ' runs</p>';
     }

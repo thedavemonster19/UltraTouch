@@ -48,6 +48,7 @@
   class PairOff {
     constructor(opts) {
       this.onEnd = opts.onEnd;
+      this.onRecord = opts.onRecord || (() => {});
       this.level = 0;
       this.score = 0;
       this.runs = 0;
@@ -242,6 +243,8 @@
       this.reason = reason;
       this.sel = null;
       UT.sfx.lose();
+      /* save the score now, even if the player quits from the game-over screen */
+      this.onRecord(this.result());
     }
 
     /* ---------- input ---------- */
@@ -283,9 +286,14 @@
       else this.take(this.sel, ref);
     }
 
+    result() {
+      if (!this._result) this._result = { game: 'pairoff', score: this.score, level: this.level, pairs: this.pairsMade, runs: this.runs, reason: this.reason };
+      return this._result;
+    }
+
     finish() {
       this.state = 'done';
-      this.onEnd({ game: 'pairoff', score: this.score, level: this.level, pairs: this.pairsMade, runs: this.runs, reason: this.reason });
+      this.onEnd(this.result());
     }
 
     /* ---------- loop ---------- */

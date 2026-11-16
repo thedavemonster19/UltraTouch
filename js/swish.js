@@ -43,6 +43,7 @@
   class Swish {
     constructor(opts) {
       this.onEnd = opts.onEnd;
+      this.onRecord = opts.onRecord || (() => {});
       const n = UT.clamp(opts.players || 1, 1, 4);
       this.players = [];
       for (let i = 0; i < n; i++) this.players.push({ name: 'Player ' + (i + 1), score: 0, out: false, made: 0, shots: 0, rounds: 0 });
@@ -424,17 +425,26 @@
     finish() {
       this.state = 'final';
       this.stateT = 0;
+      /* save the score the moment the game ends, even if the player leaves from the winner screen */
+      this.onRecord(this.result());
       UT.sfx.win();
+    }
+
+    result() {
+      if (!this._result) {
+        this._result = {
+          game: 'swish',
+          rounds: ROUNDS.length,
+          allClear: this.players.some((p) => p.rounds === ROUNDS.length),
+          players: this.players.map((p) => ({ name: p.name, score: p.score, made: p.made, shots: p.shots, rounds: p.rounds })),
+        };
+      }
+      return this._result;
     }
 
     report() {
       this.state = 'done';
-      this.onEnd({
-        game: 'swish',
-        rounds: ROUNDS.length,
-        allClear: this.players.some((p) => p.rounds === ROUNDS.length),
-        players: this.players.map((p) => ({ name: p.name, score: p.score, made: p.made, shots: p.shots, rounds: p.rounds })),
-      });
+      this.onEnd(this.result());
     }
 
     /* ---------- drawing ---------- */

@@ -753,6 +753,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
   class Swish {
     constructor(opts) {
       this.onEnd = opts.onEnd;
+      this.onRecord = opts.onRecord || (() => {});
       const n = UT.clamp(opts.players || 1, 1, 4);
       this.players = [];
       for (let i = 0; i < n; i++) this.players.push({ name: 'Player ' + (i + 1), score: 0, out: false, made: 0, shots: 0, rounds: 0 });
@@ -1134,17 +1135,26 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
     finish() {
       this.state = 'final';
       this.stateT = 0;
+      /* save the score the moment the game ends, even if the player leaves from the winner screen */
+      this.onRecord(this.result());
       UT.sfx.win();
+    }
+
+    result() {
+      if (!this._result) {
+        this._result = {
+          game: 'swish',
+          rounds: ROUNDS.length,
+          allClear: this.players.some((p) => p.rounds === ROUNDS.length),
+          players: this.players.map((p) => ({ name: p.name, score: p.score, made: p.made, shots: p.shots, rounds: p.rounds })),
+        };
+      }
+      return this._result;
     }
 
     report() {
       this.state = 'done';
-      this.onEnd({
-        game: 'swish',
-        rounds: ROUNDS.length,
-        allClear: this.players.some((p) => p.rounds === ROUNDS.length),
-        players: this.players.map((p) => ({ name: p.name, score: p.score, made: p.made, shots: p.shots, rounds: p.rounds })),
-      });
+      this.onEnd(this.result());
     }
 
     /* ---------- drawing ---------- */
@@ -1603,6 +1613,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
   class PairOff {
     constructor(opts) {
       this.onEnd = opts.onEnd;
+      this.onRecord = opts.onRecord || (() => {});
       this.level = 0;
       this.score = 0;
       this.runs = 0;
@@ -1797,6 +1808,8 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       this.reason = reason;
       this.sel = null;
       UT.sfx.lose();
+      /* save the score now, even if the player quits from the game-over screen */
+      this.onRecord(this.result());
     }
 
     /* ---------- input ---------- */
@@ -1838,9 +1851,14 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       else this.take(this.sel, ref);
     }
 
+    result() {
+      if (!this._result) this._result = { game: 'pairoff', score: this.score, level: this.level, pairs: this.pairsMade, runs: this.runs, reason: this.reason };
+      return this._result;
+    }
+
     finish() {
       this.state = 'done';
-      this.onEnd({ game: 'pairoff', score: this.score, level: this.level, pairs: this.pairsMade, runs: this.runs, reason: this.reason });
+      this.onEnd(this.result());
     }
 
     /* ---------- loop ---------- */
@@ -2326,8 +2344,9 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
     hub.hidden = true;
     pauseBtn.hidden = false;
     current = { game };
+    const onRecord = (result) => record(result);
     const onEnd = (result) => setTimeout(() => results(result), 50);
-    const make = () => (game === 'swish' ? new UT.Swish({ players: swishPlayers, onEnd }) : new UT.PairOff({ onEnd }));
+    const make = () => (game === 'swish' ? new UT.Swish({ players: swishPlayers, onEnd, onRecord }) : new UT.PairOff({ onEnd, onRecord }));
     const fontsReady = document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 1200))]) : Promise.resolve();
     fontsReady.then(() => stage.run(make()));
   }
@@ -2410,19 +2429,33 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
     );
   }
 
-  function results(r) {
-    if (!current) return;
-    stage.paused = true;
-    pauseBtn.hidden = true;
-    let body = '';
+  /* add a finished game to the high scores exactly once; returns the table ranks it earned */
+  function record(r) {
+    if (r.ranks) return r.ranks;
     const ranks = [];
     if (r.game === 'swish') {
-      const sorted = r.players.slice().sort((a, b) => b.score - a.score);
       r.players.forEach((p) => {
         const label = r.players.length > 1 ? p.name : p.rounds === r.rounds ? 'All ' + r.rounds + ' rounds' : 'Round ' + Math.min(p.rounds + 1, r.rounds);
         const rank = UT.scores.add('swish', p.score, label);
         if (rank >= 0) ranks.push(rank);
       });
+    } else {
+      const rank = UT.scores.add('pairoff', r.score, 'Deal ' + r.level);
+      if (rank >= 0) ranks.push(rank);
+    }
+    r.ranks = ranks;
+    refreshBest();
+    return ranks;
+  }
+
+  function results(r) {
+    if (!current) return;
+    stage.paused = true;
+    pauseBtn.hidden = true;
+    let body = '';
+    const ranks = record(r);
+    if (r.game === 'swish') {
+      const sorted = r.players.slice().sort((a, b) => b.score - a.score);
       if (r.players.length === 1) {
         const p = r.players[0];
         const pct = p.shots ? Math.round((p.made / p.shots) * 100) : 0;
@@ -2436,8 +2469,6 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
         body += '</div>';
       }
     } else {
-      const rank = UT.scores.add('pairoff', r.score, 'Deal ' + r.level);
-      if (rank >= 0) ranks.push(rank);
       body += '<div class="big-score">' + r.score.toLocaleString() + '</div>';
       body += '<p class="note">' + esc(r.reason) + ' · reached deal ' + r.level + ' · ' + r.pairs + ' pairs, ' + r.runs + ' runs</p>';
     }
