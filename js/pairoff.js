@@ -22,7 +22,12 @@
   const SPEED_MIN = 50;
   const SPEED_HOLD = 1.5;
   const SPEED_DRAIN = 150;
-  const CLEAR_PER_SEC = 50;
+  /* a game is two timed rounds, plus a bonus round for scores over BONUS_TARGET after round 2;
+   * clearing the board inside a round deals a fresh one on the same clock */
+  const ROUND_TIME = 120;
+  const ROUNDS = 2;
+  const BONUS_TARGET = 80000;
+  const BOARD_CLEAR = 2000;
   const DOTS = 20;
   const FRAME = '#2a1650';
   const FRAME_HI = '#5b2fa8';
@@ -49,7 +54,8 @@
     constructor(opts) {
       this.onEnd = opts.onEnd;
       this.onRecord = opts.onRecord || (() => {});
-      this.level = 0;
+      this.round = 0;
+      this.boards = 0;
       this.score = 0;
       this.runs = 0;
       this.pairsMade = 0;
@@ -57,11 +63,27 @@
       this.popups = new UT.Popups();
       this.W = 960;
       this.H = 540;
-      this.newDeal();
+      this.flying = [];
+      this.clock = 0;
+      this.startRound();
     }
 
-    newDeal() {
-      this.level++;
+    get bonusRound() { return this.round > ROUNDS; }
+
+    startRound() {
+      this.round++;
+      this.timeMax = ROUND_TIME;
+      this.timeLeft = ROUND_TIME;
+      this.lastTick = 11;
+      this.reason = '';
+      this.newBoard();
+      this.state = 'intro';
+      this.stateT = 0;
+    }
+
+    /* a fresh 28-card board; the round clock keeps running */
+    newBoard() {
+      this.boards++;
       const deck = shuffled();
       this.slots = [];
       let n = 0;
@@ -77,16 +99,8 @@
       this.held = []; /* passed-on cards waiting for a gap in the board */
       this.speedT = 0; /* seconds since the last match (or since the deal started) */
       this.sel = null;
-      this.timeMax = Math.max(60, 120 - 10 * (this.level - 1));
-      this.timeLeft = this.timeMax;
-      this.state = 'intro';
-      this.stateT = 0;
-      this.clock = 0;
-      this.flying = [];
       this.shakeT = 0;
       this.shakeIds = [];
-      this.lastTick = 11;
-      this.reason = '';
     }
 
     get speed() { return Math.max(SPEED_MIN, Math.round((SPEED_MAX - SPEED_DRAIN * Math.max(0, this.speedT - SPEED_HOLD)) / 5) * 5); }
@@ -227,24 +241,36 @@
     afterMove() {
       this.fillGaps();
       if (!this.remaining()) {
-        this.cleared = { bonus: Math.floor(this.timeLeft) * CLEAR_PER_SEC, deck: this.stock.length * 100 };
+        this.cleared = { bonus: BOARD_CLEAR, deck: this.stock.length * 100 };
         this.score += this.cleared.bonus + this.cleared.deck;
-        this.state = 'cleared';
+        this.state = 'cleared'; /* the clock pauses for the banner, then a new board is dealt */
         this.stateT = 0;
         UT.sfx.win();
         return;
       }
-      if (!this.stock.length && !this.findMatch()) this.over('No matches left and the deck is empty');
+      /* stuck with the deck empty: sweep the board away and deal a fresh one on the same clock (no board bonus) */
+      if (!this.stock.length && !this.findMatch()) {
+        this.cleared = null;
+        this.state = 'cleared';
+        this.stateT = 0;
+        UT.sfx.nope();
+      }
     }
 
-    over(reason) {
-      this.state = 'over';
+    /* end of a round: on to the next round, the bonus round, or game over */
+    endRound(reason) {
+      this.state = 'roundEnd';
       this.stateT = 0;
       this.reason = reason;
       this.sel = null;
-      UT.sfx.lose();
-      /* save the score now, even if the player quits from the game-over screen */
-      this.onRecord(this.result());
+      if (this.round < ROUNDS) this.next = 'round';
+      else if (this.round === ROUNDS && this.score > BONUS_TARGET) this.next = 'bonus';
+      else this.next = 'over';
+      if (this.next === 'over') {
+        UT.sfx.lose();
+        /* save the score now, even if the player quits from the game-over screen */
+        this.onRecord(this.result());
+      } else UT.sfx.win();
     }
 
     /* ---------- input ---------- */
@@ -257,17 +283,21 @@
         return;
       }
       if (this.state === 'cleared') {
-        if (this.stateT > 1) { UT.sfx.tap(); this.newDeal(); }
+        if (this.stateT > 0.6) this.dealNextBoard();
         return;
       }
-      if (this.state === 'over') {
-        if (this.stateT > 1) this.finish();
+      if (this.state === 'roundEnd') {
+        if (this.stateT > 1) {
+          UT.sfx.tap();
+          if (this.next === 'over') this.finish();
+          else this.startRound();
+        }
         return;
       }
       if (this.state !== 'play') return;
       if (this.inBox(x, y, L.take.x, L.take.y, L.take.w, L.take.h)) {
         UT.sfx.tap();
-        this.over('You took the score');
+        this.endRound('You took the score');
         this.stateT = 1;
         return;
       }
@@ -287,8 +317,15 @@
     }
 
     result() {
-      if (!this._result) this._result = { game: 'pairoff', score: this.score, level: this.level, pairs: this.pairsMade, runs: this.runs, reason: this.reason };
+      if (!this._result) this._result = { game: 'pairoff', score: this.score, round: this.round, bonus: this.bonusRound, boards: this.boards, pairs: this.pairsMade, runs: this.runs, reason: this.reason };
       return this._result;
+    }
+
+    dealNextBoard() {
+      this.newBoard();
+      this.state = 'dealing';
+      this.stateT = 0;
+      UT.sfx.deal();
     }
 
     finish() {
@@ -308,6 +345,7 @@
         this.state = 'play';
         this.stateT = 0;
       }
+      if (this.state === 'cleared' && this.stateT > 1.6) this.dealNextBoard();
       if (this.state === 'play') {
         this.speedT += dt;
         this.timeLeft -= dt;
@@ -316,7 +354,7 @@
         if (this.timeLeft <= 0) {
           this.timeLeft = 0;
           UT.sfx.horn();
-          this.over('Time ran out');
+          this.endRound('Time ran out');
         }
       }
     }
@@ -430,7 +468,7 @@
       this.popups.draw(g);
       if (this.state === 'intro') this.drawIntro(g);
       if (this.state === 'cleared') this.drawCleared(g);
-      if (this.state === 'over') this.drawOver(g);
+      if (this.state === 'roundEnd') this.drawRoundEnd(g);
     }
 
     drawHeader(g) {
@@ -444,7 +482,7 @@
       g.beginPath();
       g.arc(116, 36, 14, 0, Math.PI * 2);
       g.stroke();
-      D.text(g, String(this.level), 116, 37, 14, C.amber, { weight: 800 });
+      D.text(g, this.bonusRound ? 'B' : String(this.round), 116, 37, 14, C.amber, { weight: 800 });
       D.text(g, this.score.toLocaleString(), 254, 37, 22, C.amber, { align: 'right', family: UT.font.display, weight: 400 });
       /* title + dot timer, centre */
       D.text(g, 'PAIR OFF', W / 2, 26, 26, '#7ff0d0', { family: UT.font.display, weight: 400, stroke: '#1a0d33', strokeWidth: 6 });
@@ -607,34 +645,44 @@
     }
 
     drawIntro(g) {
-      const { y } = this.panel(g, 500, 250);
+      const { y } = this.panel(g, 520, 256);
       const cx = this.W / 2;
-      D.text(g, 'DEAL ' + this.level, cx, y + 46, 38, '#7ff0d0', { family: UT.font.display, weight: 400 });
-      D.text(g, 'Clear all 28 cards in ' + this.timeMax + ' seconds', cx, y + 88, 18, C.text, { weight: 600 });
-      D.text(g, 'PAIR (same rank) ' + PAIR_PTS.toLocaleString() + '   RUN (one up or down, K-A too) ' + RUN_PTS + '   + the speed bonus', cx, y + 120, 14, C.amber, { weight: 700 });
-      D.text(g, 'Only uncovered cards can be taken. The dealt card counts.', cx, y + 146, 14, C.dim, { weight: 500 });
-      D.text(g, 'Match fast: the green meter (up to ' + SPEED_MAX + ') is added to each match. NEXT CARD −' + DEAL_COST + '.', cx, y + 168, 14, C.dim, { weight: 500 });
-      D.text(g, 'Stuck? TAKE SCORE ends the game and keeps your points.', cx, y + 190, 14, C.dim, { weight: 500 });
-      if (this.stateT > 0.3) D.text(g, 'TAP TO DEAL', cx, y + 226, 16, C.amber, { weight: 800 });
+      D.text(g, this.bonusRound ? 'BONUS ROUND!' : 'ROUND ' + this.round + ' OF ' + ROUNDS, cx, y + 44, 36, this.bonusRound ? C.amber : '#7ff0d0', { family: UT.font.display, weight: 400 });
+      D.text(g, this.bonusRound ? 'You beat ' + BONUS_TARGET.toLocaleString() + '. One more ' + ROUND_TIME + '-second round.' : ROUND_TIME + ' seconds. Clear the board and a new one is dealt on the same clock.', cx, y + 84, 16, C.text, { weight: 600 });
+      D.text(g, 'PAIR (same rank) ' + PAIR_PTS.toLocaleString() + '   RUN (one up or down, K-A too) ' + RUN_PTS + '   + the speed bonus', cx, y + 114, 14, C.amber, { weight: 700 });
+      D.text(g, 'Only uncovered cards can be taken. The dealt card counts. NEXT CARD −' + DEAL_COST + '.', cx, y + 140, 14, C.dim, { weight: 500 });
+      D.text(g, 'Match fast: the green meter (up to ' + SPEED_MAX + ') is added to each match.', cx, y + 162, 14, C.dim, { weight: 500 });
+      D.text(g, 'Score over ' + BONUS_TARGET.toLocaleString() + ' after round ' + ROUNDS + ' earns a bonus round. TAKE SCORE ends the round.', cx, y + 184, 14, C.dim, { weight: 500 });
+      if (this.stateT > 0.3) D.text(g, 'TAP TO DEAL', cx, y + 228, 16, C.amber, { weight: 800 });
     }
 
+    /* short banner between boards; the next board deals by itself */
     drawCleared(g) {
-      const { y } = this.panel(g, 440, 220);
+      const { y } = this.panel(g, 400, 150);
       const cx = this.W / 2;
-      D.text(g, 'BOARD CLEARED', cx, y + 44, 30, '#7ff0d0', { family: UT.font.display, weight: 400 });
-      D.text(g, 'Time left  +' + this.cleared.bonus.toLocaleString(), cx, y + 90, 16, C.text, { weight: 600 });
-      D.text(g, 'Cards left in the deck  +' + this.cleared.deck.toLocaleString(), cx, y + 114, 16, C.text, { weight: 600 });
-      D.text(g, 'Score ' + this.score.toLocaleString(), cx, y + 152, 20, C.amber, { weight: 800 });
-      if (this.stateT > 1) D.text(g, 'TAP FOR THE NEXT DEAL (shorter clock)', cx, y + 194, 14, C.amber, { weight: 800 });
+      if (this.cleared) {
+        D.text(g, 'BOARD CLEARED', cx, y + 40, 28, '#7ff0d0', { family: UT.font.display, weight: 400 });
+        D.text(g, 'Board bonus +' + this.cleared.bonus.toLocaleString() + '   Deck cards +' + this.cleared.deck.toLocaleString(), cx, y + 80, 15, C.text, { weight: 600 });
+      } else {
+        D.text(g, 'NO MORE MATCHES', cx, y + 40, 28, C.coral, { family: UT.font.display, weight: 400 });
+        D.text(g, 'Deck is empty. Fresh board, same clock.', cx, y + 80, 15, C.text, { weight: 600 });
+      }
+      D.text(g, 'New board coming…', cx, y + 114, 14, C.amber, { weight: 800 });
     }
 
-    drawOver(g) {
-      const { y } = this.panel(g, 440, 200);
+    drawRoundEnd(g) {
+      const { y } = this.panel(g, 470, 220);
       const cx = this.W / 2;
-      D.text(g, 'GAME OVER', cx, y + 48, 36, C.coral, { family: UT.font.display, weight: 400 });
-      D.text(g, this.reason, cx, y + 92, 16, C.text, { weight: 600 });
-      D.text(g, 'Final score ' + this.score.toLocaleString(), cx, y + 124, 20, C.amber, { weight: 800 });
-      if (this.stateT > 1) D.text(g, 'TAP TO CONTINUE', cx, y + 170, 15, C.amber, { weight: 800 });
+      const title = this.next === 'over' ? 'GAME OVER' : this.next === 'bonus' ? 'BONUS ROUND!' : 'ROUND ' + this.round + ' DONE';
+      D.text(g, title, cx, y + 46, 34, this.next === 'over' ? C.coral : this.next === 'bonus' ? C.amber : '#7ff0d0', { family: UT.font.display, weight: 400 });
+      D.text(g, this.reason, cx, y + 88, 15, C.dim, { weight: 600 });
+      D.text(g, 'Score ' + this.score.toLocaleString(), cx, y + 120, 22, C.amber, { weight: 800 });
+      let sub = '';
+      if (this.next === 'round') sub = 'Round ' + (this.round + 1) + ' of ' + ROUNDS + ' next';
+      else if (this.next === 'bonus') sub = 'Over ' + BONUS_TARGET.toLocaleString() + ': you earned a bonus round';
+      else if (this.round === ROUNDS) sub = 'Needed over ' + BONUS_TARGET.toLocaleString() + ' for the bonus round';
+      D.text(g, sub, cx, y + 152, 14, C.text, { weight: 600 });
+      if (this.stateT > 1) D.text(g, 'TAP TO CONTINUE', cx, y + 194, 15, C.amber, { weight: 800 });
     }
   }
 

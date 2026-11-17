@@ -230,7 +230,7 @@
         if (rank >= 0) ranks.push(rank);
       });
     } else {
-      const rank = UT.scores.add('pairoff', r.score, 'Deal ' + r.level);
+      const rank = UT.scores.add('pairoff', r.score, r.bonus ? 'Bonus round' : 'Round ' + r.round);
       if (rank >= 0) ranks.push(rank);
     }
     r.ranks = ranks;
@@ -260,7 +260,7 @@
       }
     } else {
       body += '<div class="big-score">' + r.score.toLocaleString() + '</div>';
-      body += '<p class="note">' + esc(r.reason) + ' · reached deal ' + r.level + ' · ' + r.pairs + ' pairs, ' + r.runs + ' runs</p>';
+      body += '<p class="note">' + esc(r.reason) + ' · ' + (r.bonus ? 'played the bonus round' : 'round ' + r.round + ' of 2') + ' · ' + r.boards + (r.boards === 1 ? ' board' : ' boards') + ' · ' + r.pairs + ' pairs, ' + r.runs + ' runs</p>';
     }
     if (ranks.includes(0)) body = '<p class="center"><span class="badge">NEW BEST</span></p>' + body;
     body = '<div class="split"><div class="summary">' + body + '</div><div class="board"><p class="note">Top scores on this device</p>' + tableHtml(r.game, ranks) + '</div></div>';
