@@ -27,7 +27,8 @@
   const ROUND_TIME = 120;
   const ROUNDS = 2;
   const BONUS_TARGET = 80000;
-  const BOARD_CLEAR = 2000;
+  const BOARD_CLEAR = 10000;
+  const PER_DECK_CARD = 1000; /* for every card still left in the deck when the board is cleared */
   const DOTS = 20;
   const FRAME = '#2a1650';
   const FRAME_HI = '#5b2fa8';
@@ -241,7 +242,7 @@
     afterMove() {
       this.fillGaps();
       if (!this.remaining()) {
-        this.cleared = { bonus: BOARD_CLEAR, deck: this.stock.length * 100 };
+        this.cleared = { bonus: BOARD_CLEAR, deck: this.stock.length * PER_DECK_CARD };
         this.score += this.cleared.bonus + this.cleared.deck;
         this.state = 'cleared'; /* the clock pauses for the banner, then a new board is dealt */
         this.stateT = 0;
