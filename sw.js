@@ -1,5 +1,5 @@
 /* Offline cache for UltraTouch. Bump VERSION when shipping changes. */
-const VERSION = 'ut-e71a0ccdea';
+const VERSION = 'ut-4325a7d02e';
 const FILES = ['./', 'index.html', 'css/style.css', 'js/core.js', 'js/swish.js', 'js/pairoff.js', 'js/app.js',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 self.addEventListener('install', (e) => {

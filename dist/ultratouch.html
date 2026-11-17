@@ -1642,6 +1642,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       this.timeLeft = ROUND_TIME;
       this.lastTick = 11;
       this.reason = '';
+      this.cleared = null;
       this.newBoard();
       this.state = 'intro';
       this.stateT = 0;
@@ -1806,21 +1807,14 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 
     afterMove() {
       this.fillGaps();
+      /* one board per round: the round ends when the board is cleared or the clock runs out, whichever is first */
       if (!this.remaining()) {
         this.cleared = { bonus: BOARD_CLEAR, deck: this.stock.length * PER_DECK_CARD };
         this.score += this.cleared.bonus + this.cleared.deck;
-        this.state = 'cleared'; /* the clock pauses for the banner, then a new board is dealt */
-        this.stateT = 0;
-        UT.sfx.win();
+        this.endRound('Board cleared!');
         return;
       }
-      /* stuck with the deck empty: sweep the board away and deal a fresh one on the same clock (no board bonus) */
-      if (!this.stock.length && !this.findMatch()) {
-        this.cleared = null;
-        this.state = 'cleared';
-        this.stateT = 0;
-        UT.sfx.nope();
-      }
+      if (!this.stock.length && !this.findMatch()) this.endRound('No matches left and the deck is empty');
     }
 
     /* end of a round: on to the next round, the bonus round, or game over */
@@ -2214,7 +2208,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       const { y } = this.panel(g, 520, 256);
       const cx = this.W / 2;
       D.text(g, this.bonusRound ? 'BONUS ROUND!' : 'ROUND ' + this.round + ' OF ' + ROUNDS, cx, y + 44, 36, this.bonusRound ? C.amber : '#7ff0d0', { family: UT.font.display, weight: 400 });
-      D.text(g, this.bonusRound ? 'You beat ' + BONUS_TARGET.toLocaleString() + '. One more ' + ROUND_TIME + '-second round.' : ROUND_TIME + ' seconds. Clear the board and a new one is dealt on the same clock.', cx, y + 84, 16, C.text, { weight: 600 });
+      D.text(g, this.bonusRound ? 'You beat ' + BONUS_TARGET.toLocaleString() + '. One more ' + ROUND_TIME + '-second round.' : 'Clear all 28 cards in ' + ROUND_TIME + ' s: +' + BOARD_CLEAR.toLocaleString() + ' and +' + PER_DECK_CARD.toLocaleString() + ' per card left in the deck.', cx, y + 84, 16, C.text, { weight: 600 });
       D.text(g, 'PAIR (same rank) ' + PAIR_PTS.toLocaleString() + '   RUN (one up or down, K-A too) ' + RUN_PTS + '   + the speed bonus', cx, y + 114, 14, C.amber, { weight: 700 });
       D.text(g, 'Only uncovered cards can be taken. The dealt card counts. NEXT CARD −' + DEAL_COST + '.', cx, y + 140, 14, C.dim, { weight: 500 });
       D.text(g, 'Match fast: the green meter (up to ' + SPEED_MAX + ') is added to each match.', cx, y + 162, 14, C.dim, { weight: 500 });
@@ -2237,11 +2231,17 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
     }
 
     drawRoundEnd(g) {
-      const { y } = this.panel(g, 470, 220);
+      const extra = this.cleared ? 48 : 0;
+      const { y: y0 } = this.panel(g, 480, 220 + extra);
       const cx = this.W / 2;
       const title = this.next === 'over' ? 'GAME OVER' : this.next === 'bonus' ? 'BONUS ROUND!' : 'ROUND ' + this.round + ' DONE';
-      D.text(g, title, cx, y + 46, 34, this.next === 'over' ? C.coral : this.next === 'bonus' ? C.amber : '#7ff0d0', { family: UT.font.display, weight: 400 });
-      D.text(g, this.reason, cx, y + 88, 15, C.dim, { weight: 600 });
+      D.text(g, title, cx, y0 + 46, 34, this.next === 'over' ? C.coral : this.next === 'bonus' ? C.amber : '#7ff0d0', { family: UT.font.display, weight: 400 });
+      D.text(g, this.reason, cx, y0 + 88, 15, this.cleared ? '#7ff0d0' : C.dim, { weight: 700 });
+      if (this.cleared) {
+        D.text(g, 'Round bonus  +' + this.cleared.bonus.toLocaleString(), cx, y0 + 114, 15, C.text, { weight: 600 });
+        D.text(g, 'Cards left in the deck  +' + this.cleared.deck.toLocaleString() + '  (' + (this.cleared.deck / PER_DECK_CARD) + ' × ' + PER_DECK_CARD.toLocaleString() + ')', cx, y0 + 136, 15, C.text, { weight: 600 });
+      }
+      const y = y0 + extra;
       D.text(g, 'Score ' + this.score.toLocaleString(), cx, y + 120, 22, C.amber, { weight: 800 });
       let sub = '';
       if (this.next === 'round') sub = 'Round ' + (this.round + 1) + ' of ' + ROUNDS + ' next';
