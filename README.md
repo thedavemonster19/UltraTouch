@@ -21,7 +21,7 @@ No build step: plain HTML, CSS and JS. Canvas games are drawn at a 540-unit-tall
 
 ## Shared leaderboard (Google Form + Sheet, no database)
 
-Scores post to a Google Form in the background; the board is read back from the Form's response Sheet. Players only type a nickname (remembered per phone). The board shows each nickname's best score. Delete a row in the Sheet to remove a bad score; scores above a believable maximum are ignored.
+Scores post to a Google Form in the background; the board is read back from the Form's response Sheet. Players only type a nickname (remembered per phone). The board is a classic arcade all-time top 10 per game: every posted score counts, so the same nickname can appear several times. Delete a row in the Sheet to remove a bad score; scores above a believable maximum are ignored.
 
 One-time setup:
 1. Create a Google Form with four **Short answer** questions, in this order: `Game`, `Name`, `Score`, `Detail`. In Settings → Responses, turn **off** "Collect email addresses" and any sign-in requirement.

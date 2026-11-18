@@ -308,8 +308,9 @@
       status.textContent = 'Posted! Checking your rank…';
       setTimeout(async () => {
         try {
-          const rk = await UT.lb.rankOf(r.game, names[0]);
-          status.textContent = rk ? names[0] + ' is #' + rk.rank + ' of ' + rk.of + ' on the ' + (r.game === 'swish' ? 'Swish Shot' : 'Pair Off') + ' board (best ' + rk.best.toLocaleString() + ').' : 'Posted! It can take a few seconds to show on the board.';
+          const rk = await UT.lb.rankOf(r.game, names[0], who[0].score);
+          const board = r.game === 'swish' ? 'Swish Shot' : 'Pair Off';
+          status.textContent = rk ? (rk.rank <= 10 ? names[0] + ' made the ' + board + ' top 10 at #' + rk.rank + '!' : names[0] + '\'s ' + rk.score.toLocaleString() + ' is #' + rk.rank + ' of ' + rk.of + ' ' + board + ' scores.') : 'Posted! It can take a few seconds to show on the board.';
         } catch (e) { status.textContent = 'Posted! Open Leaderboard on the menu to see it.'; }
       }, 2500);
     });
@@ -323,7 +324,7 @@
     UT.sfx.unlock();
     UT.sfx.tap();
     const col = (cls, title, id) => '<div class="board lb-board ' + cls + '"><h3>' + title + '</h3><div id="' + id + '"><p class="note">Loading…</p></div></div>';
-    const note = UT.lb.enabled ? '<p class="note">Each player\'s best score. Post yours from the game-over screen.</p>' : '<p class="note">The shared board isn\'t switched on yet. Showing this phone\'s top scores.</p>';
+    const note = UT.lb.enabled ? '<p class="note">Top 10 scores of all time. Post yours from the game-over screen.</p>' : '<p class="note">The shared board isn\'t switched on yet. Showing this phone\'s top scores.</p>';
     sheet('Leaderboard', note + '<div class="split">' + col('swish', 'Swish Shot', 'lb-swish') + col('pair', 'Pair Off', 'lb-pair') + '</div>', [
       { label: 'Refresh', run: () => { UT.lb.refresh(); openLeaders(); } },
       { label: 'Close', primary: true, run: closeSheet },

@@ -1,4 +1,4 @@
-/* Shared leaderboard with no server of our own: scores are posted to a Google Form, whose responses land in
+/* Shared all-time top-10 boards with no server of our own: scores are posted to a Google Form, whose responses land in
  * a Google Sheet that is shared view-only; the board is read back from that Sheet. The Sheet owner can delete
  * any bad row. Configured in leaderboard-config.js. */
 (function () {
@@ -79,23 +79,22 @@
       return fetch(CFG.formAction, { method: 'POST', mode: 'no-cors', body }).then(() => true, () => false);
     },
 
-    /* each player's best score on a board, highest first */
+    /* classic arcade table: every score ever posted, highest first; the same player can appear more than
+     * once, and on a tie the earlier score stays ahead (rows arrive in the order they were posted) */
     async top(game, n) {
       if (!cache || Date.now() - cache.at > 15000) cache = { at: Date.now(), rows: await readSheet() };
       const key = boardKey(game);
-      const best = new Map();
-      cache.rows.filter((r) => r.game === key).forEach((r) => {
-        const id = r.name.toLowerCase();
-        if (!best.has(id) || best.get(id).score < r.score) best.set(id, r);
-      });
-      const list = [...best.values()].sort((a, b) => b.score - a.score);
+      const list = cache.rows.filter((r) => r.game === key).sort((a, b) => b.score - a.score);
       return n ? list.slice(0, n) : list;
     },
 
-    async rankOf(game, name) {
+    /* where this exact score landed among all scores on the board */
+    async rankOf(game, name, score) {
       const list = await this.top(game);
-      const i = list.findIndex((r) => r.name.toLowerCase() === clean(name).toLowerCase());
-      return i < 0 ? null : { rank: i + 1, of: list.length, best: list[i].score };
+      const id = clean(name).toLowerCase();
+      let i = -1;
+      for (let k = list.length - 1; k >= 0; k--) if (list[k].name.toLowerCase() === id && list[k].score === Math.round(score)) { i = k; break; }
+      return i < 0 ? null : { rank: i + 1, of: list.length, score: list[i].score };
     },
 
     refresh() { cache = null; },
