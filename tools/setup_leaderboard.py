@@ -26,7 +26,7 @@ def main(prefilled: str, sheet: str) -> None:
     missing = [w for w in ("game", "name", "score") if w not in entries]
     if missing:
         sys.exit("Couldn't find the " + ", ".join(missing) + " question(s). Fill the pre-filled link with GAME / NAME / 123 / DETAIL.")
-    s = re.search(r"/spreadsheets/d/([A-Za-z0-9_-]+)", sheet)
+    s = re.search(r"/spreadsheets/(?:u/\d+/)?d/([A-Za-z0-9_-]+)", sheet)
     if not s:
         sys.exit("That doesn't look like a Google Sheet link (expected .../spreadsheets/d/<id>/...).")
     cfg = (
