@@ -158,6 +158,13 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
   font-weight: 800;
 }
 .pchip[aria-pressed='true'] { background: var(--amber); border-color: var(--amber); color: var(--ink); }
+/* the shared board's #1 for this game, always on the menu */
+.champ { display: flex; align-items: baseline; gap: 6px; margin: 0; font-size: 14px; min-width: 0; color: var(--text); }
+.champ-tag { font-family: var(--font-display); font-size: 12px; color: var(--ink); background: var(--amber); border-radius: 6px; padding: 2px 6px; flex: none; }
+.champ-name { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.champ-score { font-family: var(--font-display); color: var(--amber); font-variant-numeric: tabular-nums; margin-left: auto; flex: none; }
+.tile-pair .champ-score { color: var(--mint); }
+.tile-pair .champ-tag { background: var(--mint); }
 .tile-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; }
 .best { font-size: 13px; color: var(--dim); font-variant-numeric: tabular-nums; }
 .best b { color: var(--text); font-weight: 800; }
@@ -329,8 +336,9 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
             <button type="button" class="pchip" data-p="3" aria-pressed="false">3</button>
             <button type="button" class="pchip" data-p="4" aria-pressed="false">4</button>
           </div>
+          <p class="champ" id="champ-swish" hidden><span class="champ-tag">#1</span> <b class="champ-name"></b> <span class="champ-score"></span></p>
           <div class="tile-foot">
-            <span class="best">Best <b id="best-swish">—</b></span>
+            <span class="best">Your best <b id="best-swish">—</b></span>
             <button type="button" class="play" data-game="swish">Play</button>
           </div>
         </div>
@@ -359,9 +367,10 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
         <div class="tile-body">
           <h2>Pair Off</h2>
           <p>Race the clock to clear 28 overlapping cards. Pairs of the same rank pay ×1,200, runs one up or down pay ×400. The next card costs you.</p>
-          <div class="players"><span class="label">Solo · deals get faster</span></div>
+          <div class="players"><span class="label">Solo · 2 rounds + bonus round</span></div>
+          <p class="champ" id="champ-pairoff" hidden><span class="champ-tag">#1</span> <b class="champ-name"></b> <span class="champ-score"></span></p>
           <div class="tile-foot">
-            <span class="best">Best <b id="best-pairoff">—</b></span>
+            <span class="best">Your best <b id="best-pairoff">—</b></span>
             <button type="button" class="play" data-game="pairoff">Play</button>
           </div>
         </div>
@@ -2453,6 +2462,28 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       $('#best-' + g).textContent = b ? b.toLocaleString() : '—';
     });
   }
+  /* each game's #1 from the shared board, shown on its menu tile; last known value shows instantly */
+  function showChamp(g, top) {
+    const el = $('#champ-' + g);
+    if (!el) return;
+    el.hidden = !top;
+    if (!top) return;
+    el.querySelector('.champ-name').textContent = top.name;
+    el.querySelector('.champ-score').textContent = top.score.toLocaleString();
+  }
+  async function refreshChamps() {
+    if (!UT.lb.enabled) return;
+    ['swish', 'pairoff'].forEach((g) => showChamp(g, UT.store.get('champ:' + g, null)));
+    fitHub();
+    for (const g of ['swish', 'pairoff']) {
+      try {
+        const top = (await UT.lb.top(g, 1))[0] || null;
+        UT.store.set('champ:' + g, top);
+        showChamp(g, top);
+      } catch (e) { /* offline: keep the last known #1 */ }
+    }
+    fitHub();
+  }
   function setPlayers(n) {
     swishPlayers = n;
     UT.store.set('swishPlayers', n);
@@ -2533,6 +2564,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
     hub.hidden = false;
     refreshBest();
     fitHub();
+    refreshChamps();
   }
 
   /* ---------- sheet ---------- */
@@ -2690,6 +2722,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       const sent = await Promise.all(who.map((w, i) => (w.score > 0 ? UT.lb.submit(r.game, names[i], w.score, w.detail) : Promise.resolve(true))));
       if (!sent.every(Boolean)) { btn.disabled = false; status.textContent = 'Could not reach the leaderboard. Check your connection and try again.'; return; }
       r.posted = true;
+      UT.lb.refresh();
       status.textContent = 'Posted! Checking your rank…';
       setTimeout(async () => {
         try {
@@ -2727,6 +2760,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
   $('#btn-leaders').addEventListener('click', openLeaders);
 
   refreshBest();
+  refreshChamps();
 
   /* ---------- offline support when hosted as a site (skipped inside sandboxed embeds) ---------- */
   if (!window.UT_NO_SW && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Permanent+Marker&family=Rubik:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="css/style.css?v=3e1a6f5059">
+<link rel="stylesheet" href="css/style.css?v=526de85bff">
 </head>
 <body>
 <div id="app">
@@ -63,8 +63,9 @@
             <button type="button" class="pchip" data-p="3" aria-pressed="false">3</button>
             <button type="button" class="pchip" data-p="4" aria-pressed="false">4</button>
           </div>
+          <p class="champ" id="champ-swish" hidden><span class="champ-tag">#1</span> <b class="champ-name"></b> <span class="champ-score"></span></p>
           <div class="tile-foot">
-            <span class="best">Best <b id="best-swish">—</b></span>
+            <span class="best">Your best <b id="best-swish">—</b></span>
             <button type="button" class="play" data-game="swish">Play</button>
           </div>
         </div>
@@ -93,9 +94,10 @@
         <div class="tile-body">
           <h2>Pair Off</h2>
           <p>Race the clock to clear 28 overlapping cards. Pairs of the same rank pay ×1,200, runs one up or down pay ×400. The next card costs you.</p>
-          <div class="players"><span class="label">Solo · deals get faster</span></div>
+          <div class="players"><span class="label">Solo · 2 rounds + bonus round</span></div>
+          <p class="champ" id="champ-pairoff" hidden><span class="champ-tag">#1</span> <b class="champ-name"></b> <span class="champ-score"></span></p>
           <div class="tile-foot">
-            <span class="best">Best <b id="best-pairoff">—</b></span>
+            <span class="best">Your best <b id="best-pairoff">—</b></span>
             <button type="button" class="play" data-game="pairoff">Play</button>
           </div>
         </div>
@@ -117,11 +119,11 @@
   </div>
 
 </div>
-<script src="js/core.js?v=3e1a6f5059"></script>
-<script src="js/swish.js?v=3e1a6f5059"></script>
-<script src="js/pairoff.js?v=3e1a6f5059"></script>
-<script src="js/leaderboard-config.js?v=3e1a6f5059"></script>
-<script src="js/leaderboard.js?v=3e1a6f5059"></script>
-<script src="js/app.js?v=3e1a6f5059"></script>
+<script src="js/core.js?v=526de85bff"></script>
+<script src="js/swish.js?v=526de85bff"></script>
+<script src="js/pairoff.js?v=526de85bff"></script>
+<script src="js/leaderboard-config.js?v=526de85bff"></script>
+<script src="js/leaderboard.js?v=526de85bff"></script>
+<script src="js/app.js?v=526de85bff"></script>
 </body>
 </html>

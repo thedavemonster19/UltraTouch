@@ -68,6 +68,28 @@
       $('#best-' + g).textContent = b ? b.toLocaleString() : '—';
     });
   }
+  /* each game's #1 from the shared board, shown on its menu tile; last known value shows instantly */
+  function showChamp(g, top) {
+    const el = $('#champ-' + g);
+    if (!el) return;
+    el.hidden = !top;
+    if (!top) return;
+    el.querySelector('.champ-name').textContent = top.name;
+    el.querySelector('.champ-score').textContent = top.score.toLocaleString();
+  }
+  async function refreshChamps() {
+    if (!UT.lb.enabled) return;
+    ['swish', 'pairoff'].forEach((g) => showChamp(g, UT.store.get('champ:' + g, null)));
+    fitHub();
+    for (const g of ['swish', 'pairoff']) {
+      try {
+        const top = (await UT.lb.top(g, 1))[0] || null;
+        UT.store.set('champ:' + g, top);
+        showChamp(g, top);
+      } catch (e) { /* offline: keep the last known #1 */ }
+    }
+    fitHub();
+  }
   function setPlayers(n) {
     swishPlayers = n;
     UT.store.set('swishPlayers', n);
@@ -148,6 +170,7 @@
     hub.hidden = false;
     refreshBest();
     fitHub();
+    refreshChamps();
   }
 
   /* ---------- sheet ---------- */
@@ -305,6 +328,7 @@
       const sent = await Promise.all(who.map((w, i) => (w.score > 0 ? UT.lb.submit(r.game, names[i], w.score, w.detail) : Promise.resolve(true))));
       if (!sent.every(Boolean)) { btn.disabled = false; status.textContent = 'Could not reach the leaderboard. Check your connection and try again.'; return; }
       r.posted = true;
+      UT.lb.refresh();
       status.textContent = 'Posted! Checking your rank…';
       setTimeout(async () => {
         try {
@@ -342,6 +366,7 @@
   $('#btn-leaders').addEventListener('click', openLeaders);
 
   refreshBest();
+  refreshChamps();
 
   /* ---------- offline support when hosted as a site (skipped inside sandboxed embeds) ---------- */
   if (!window.UT_NO_SW && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
