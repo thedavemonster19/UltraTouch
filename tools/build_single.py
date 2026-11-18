@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
-ASSETS = ["css/style.css", "js/core.js", "js/swish.js", "js/pairoff.js", "js/app.js"]
+ASSETS = ["css/style.css", "js/core.js", "js/swish.js", "js/pairoff.js", "js/leaderboard-config.js", "js/leaderboard.js", "js/app.js"]
 
 
 def stamp() -> str:

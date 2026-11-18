@@ -19,6 +19,16 @@ No build step: plain HTML, CSS and JS. Canvas games are drawn at a 540-unit-tall
 - Works offline after the first visit (service worker, hosted copy only).
 - **Release step:** run `python3 tools/build_single.py` (and again with `--fragment` for the Artifact). It stamps every CSS/JS link in `index.html` and the service-worker cache name with a content hash, so phones always load a matching fresh set instead of GitHub Pages' 10-minute cached copy. It also writes the one-file `dist/ultratouch.html`.
 
+## Shared leaderboard (Google Form + Sheet, no database)
+
+Scores post to a Google Form in the background; the board is read back from the Form's response Sheet. Players only type a nickname (remembered per phone). The board shows each nickname's best score. Delete a row in the Sheet to remove a bad score; scores above a believable maximum are ignored.
+
+One-time setup:
+1. Create a Google Form with four **Short answer** questions, in this order: `Game`, `Name`, `Score`, `Detail`. In Settings → Responses, turn **off** "Collect email addresses" and any sign-in requirement.
+2. **Responses** tab → **Link to Sheets** → create a new spreadsheet. In that Sheet: **Share** → General access → **Anyone with the link: Viewer**. Copy the Sheet's link.
+3. Back in the Form: **⋮ → Get pre-filled link**, answer `GAME`, `NAME`, `123`, `DETAIL`, then **Get link → Copy link**.
+4. Run `python3 tools/setup_leaderboard.py "<pre-filled link>" "<Sheet link>"`, then the release step, then push.
+
 ## Sound
 
 All sound is synthesized live with Web Audio (no files). Swish Shot: shot whoosh, a net swish + score chime + short cheer on every bucket (extra sparkle for a clean swish), rim clang, backboard thud, ball bounce, and on a 3-in-a-row streak a thunder crack, electric zap, power-up run and crowd roar, then a zap on every bucket while the streak lasts. Everything runs through a limiter so big moments are loud without crackling. On iPhone the page asks for media playback (Audio Session API plus a silent looping clip), so sound plays even with the ring/silent switch on silent; phone volume still applies. Sound on/off is on the menu and in the pause sheet.
@@ -31,11 +41,14 @@ css/style.css         hub, sheets
 js/core.js            storage, high scores, Web Audio synth, canvas Stage, helpers
 js/swish.js           Swish Shot
 js/pairoff.js         Pair Off
-js/app.js             menu, pause/results, fullscreen, service worker
+js/app.js             menu, pause/results, leaderboard UI, fullscreen, service worker
+js/leaderboard.js     post to the Google Form, read the Sheet
+js/leaderboard-config.js  form/sheet ids (blank = leaderboard off)
 manifest.webmanifest  PWA (fullscreen, any orientation)
 sw.js                 offline cache (bump VERSION on release)
 icons/                generated PNG icons
-tools/build_single.py one-file bundle
+tools/build_single.py one-file bundle + release stamping
+tools/setup_leaderboard.py  turn on the shared leaderboard from two Google links
 ```
 
 ## Research notes (2026-11-16)

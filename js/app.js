@@ -264,11 +264,81 @@
     }
     if (ranks.includes(0)) body = '<p class="center"><span class="badge">NEW BEST</span></p>' + body;
     body = '<div class="split"><div class="summary">' + body + '</div><div class="board"><p class="note">Top scores on this device</p>' + tableHtml(r.game, ranks) + '</div></div>';
+    if (UT.lb.enabled) body += postHtml(r);
     sheet(r.game === 'swish' ? 'Final buzzer' : 'Cards down', body, [
       { label: 'Play again', primary: true, run: () => start(r.game) },
       { label: 'Menu', run: toHub },
     ]);
+    if (UT.lb.enabled) wirePost(r);
   }
+
+  /* ---------- shared leaderboard ---------- */
+  function scorers(r) {
+    return r.game === 'swish' ? r.players.map((p) => ({ label: p.name, score: p.score, detail: r.players.length > 1 ? p.made + '/' + p.shots : 'Round ' + Math.min(p.rounds + 1, r.rounds) })) : [{ label: 'You', score: r.score, detail: r.bonus ? 'Bonus round' : 'Round ' + r.round }];
+  }
+  function postHtml(r) {
+    const who = scorers(r);
+    const multi = who.length > 1;
+    let h = '<div class="post" id="lb-post">';
+    who.forEach((w, i) => {
+      const val = i === 0 ? UT.lb.savedName() : '';
+      h += '<input id="lb-name-' + i + '" class="lb-name" type="text" inputmode="text" autocomplete="nickname" autocapitalize="words" maxlength="' + UT.lb.nameMax + '" placeholder="' + (multi ? esc(w.label) + ' nickname' : 'Your nickname') + '" value="' + esc(val) + '" aria-label="' + esc(w.label) + ' nickname">';
+    });
+    h += '<button id="lb-send" type="button">' + (multi ? 'Post scores' : 'Post score') + '</button>';
+    h += '<p class="note" id="lb-status">' + (r.posted ? 'Already posted.' : 'Post to the shared leaderboard so your friends can see it.') + '</p></div>';
+    return h;
+  }
+  function wirePost(r) {
+    const btn = $('#lb-send');
+    const status = $('#lb-status');
+    const inputs = [...document.querySelectorAll('.lb-name')];
+    if (r.posted) btn.disabled = true;
+    inputs.forEach((el) => el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); btn.click(); } }));
+    btn.addEventListener('click', async () => {
+      const who = scorers(r);
+      const names = inputs.map((el) => UT.lb.clean(el.value));
+      const missing = names.findIndex((n, i) => !n && who[i].score > 0);
+      if (missing >= 0) { status.textContent = 'Type a nickname first (letters and numbers, up to ' + UT.lb.nameMax + ').'; inputs[missing].focus(); return; }
+      btn.disabled = true;
+      status.textContent = 'Posting…';
+      UT.lb.saveName(names[0]);
+      const sent = await Promise.all(who.map((w, i) => (w.score > 0 ? UT.lb.submit(r.game, names[i], w.score, w.detail) : Promise.resolve(true))));
+      if (!sent.every(Boolean)) { btn.disabled = false; status.textContent = 'Could not reach the leaderboard. Check your connection and try again.'; return; }
+      r.posted = true;
+      status.textContent = 'Posted! Checking your rank…';
+      setTimeout(async () => {
+        try {
+          const rk = await UT.lb.rankOf(r.game, names[0]);
+          status.textContent = rk ? names[0] + ' is #' + rk.rank + ' of ' + rk.of + ' on the ' + (r.game === 'swish' ? 'Swish Shot' : 'Pair Off') + ' board (best ' + rk.best.toLocaleString() + ').' : 'Posted! It can take a few seconds to show on the board.';
+        } catch (e) { status.textContent = 'Posted! Open Leaderboard on the menu to see it.'; }
+      }, 2500);
+    });
+  }
+
+  function boardHtml(list) {
+    if (!list.length) return '<p class="note">No scores yet. Be the first.</p>';
+    return '<div class="scores">' + list.map((e, i) => '<span class="rank">#' + (i + 1) + '</span><span>' + esc(e.name) + (e.detail ? ' · ' + esc(e.detail) : '') + '</span><span class="val">' + e.score.toLocaleString() + '</span>').join('') + '</div>';
+  }
+  async function openLeaders() {
+    UT.sfx.unlock();
+    UT.sfx.tap();
+    const col = (cls, title, id) => '<div class="board lb-board ' + cls + '"><h3>' + title + '</h3><div id="' + id + '"><p class="note">Loading…</p></div></div>';
+    const note = UT.lb.enabled ? '<p class="note">Each player\'s best score. Post yours from the game-over screen.</p>' : '<p class="note">The shared board isn\'t switched on yet. Showing this phone\'s top scores.</p>';
+    sheet('Leaderboard', note + '<div class="split">' + col('swish', 'Swish Shot', 'lb-swish') + col('pair', 'Pair Off', 'lb-pair') + '</div>', [
+      { label: 'Refresh', run: () => { UT.lb.refresh(); openLeaders(); } },
+      { label: 'Close', primary: true, run: closeSheet },
+    ]);
+    const fill = (id, html) => { const el = document.getElementById(id); if (el) { el.innerHTML = html; fitSheet(); } };
+    if (!UT.lb.enabled) {
+      fill('lb-swish', tableHtml('swish', []) || '<p class="note">No scores yet.</p>');
+      fill('lb-pair', tableHtml('pairoff', []) || '<p class="note">No scores yet.</p>');
+      return;
+    }
+    for (const [game, id] of [['swish', 'lb-swish'], ['pairoff', 'lb-pair']]) {
+      try { fill(id, boardHtml(await UT.lb.top(game, 10))); } catch (e) { fill(id, '<p class="note">Couldn\'t load the board. Check your connection and tap Refresh.</p>'); }
+    }
+  }
+  $('#btn-leaders').addEventListener('click', openLeaders);
 
   refreshBest();
 

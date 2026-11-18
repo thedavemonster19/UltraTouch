@@ -219,6 +219,26 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 .scores .rank { color: var(--dim); }
 .scores .val { text-align: right; font-weight: 800; }
 .scores .me { color: var(--amber); }
+/* shared leaderboard */
+.chip-hot { border-color: var(--amber); color: var(--amber); }
+.post { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; background: var(--panel); border-radius: 14px; padding: 10px 12px; }
+.post input {
+  font: inherit;
+  font-size: 16px; /* 16px stops iPhone zooming in on focus */
+  width: 9.5em;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--ink);
+  color: var(--text);
+}
+.post input:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
+.post button { border-radius: 10px; padding: 9px 16px; border: 0; background: var(--mint); color: var(--ink); font-weight: 800; font-size: 15px; }
+.post button:disabled { opacity: 0.55; }
+.post .note { flex-basis: 100%; }
+.lb-board h3 { margin: 0 0 6px; font-family: var(--font-display); font-weight: 400; font-size: 16px; text-align: center; }
+.lb-board.swish h3 { color: var(--amber); }
+.lb-board.pair h3 { color: var(--mint); }
 .sheet-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 .sheet-actions button {
   border-radius: 12px;
