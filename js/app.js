@@ -248,7 +248,7 @@
     const ranks = [];
     if (r.game === 'swish') {
       r.players.forEach((p) => {
-        const label = r.players.length > 1 ? p.name : p.rounds === r.rounds ? 'All ' + r.rounds + ' rounds' : 'Round ' + Math.min(p.rounds + 1, r.rounds);
+        const label = r.players.length > 1 ? p.name : p.bonus ? 'Bonus round' : p.rounds === r.rounds ? 'All ' + r.rounds + ' rounds' : 'Round ' + Math.min(p.rounds + 1, r.rounds);
         const rank = UT.scores.add('swish', p.score, label);
         if (rank >= 0) ranks.push(rank);
       });
@@ -273,7 +273,7 @@
         const p = r.players[0];
         const pct = p.shots ? Math.round((p.made / p.shots) * 100) : 0;
         body += '<div class="big-score">' + p.score.toLocaleString() + '</div>';
-        body += '<p class="note">' + p.made + ' of ' + p.shots + ' shots (' + pct + '%) · ' + (p.rounds === r.rounds ? 'cleared all ' + r.rounds + ' rounds' : 'reached round ' + Math.min(p.rounds + 1, r.rounds)) + '</p>';
+        body += '<p class="note">' + p.made + ' of ' + p.shots + ' shots (' + pct + '%) · ' + (p.rounds === r.rounds ? 'cleared all ' + r.rounds + ' rounds' : 'reached round ' + Math.min(p.rounds + 1, r.rounds)) + (p.bonus ? ' · bonus round +' + p.bonusPts : '') + '</p>';
       } else {
         body += '<p class="note">' + esc(sorted[0].name) + ' wins</p><div class="scores">';
         sorted.forEach((p, i) => {
@@ -297,7 +297,7 @@
 
   /* ---------- shared leaderboard ---------- */
   function scorers(r) {
-    return r.game === 'swish' ? r.players.map((p) => ({ label: p.name, score: p.score, detail: r.players.length > 1 ? p.made + '/' + p.shots : 'Round ' + Math.min(p.rounds + 1, r.rounds) })) : [{ label: 'You', score: r.score, detail: r.bonus ? 'Bonus round' : 'Round ' + r.round }];
+    return r.game === 'swish' ? r.players.map((p) => ({ label: p.name, score: p.score, detail: p.bonus ? 'Bonus round' : r.players.length > 1 ? p.made + '/' + p.shots : 'Round ' + Math.min(p.rounds + 1, r.rounds) })) : [{ label: 'You', score: r.score, detail: r.bonus ? 'Bonus round' : 'Round ' + r.round }];
   }
   function postHtml(r) {
     const who = scorers(r);

@@ -34,6 +34,10 @@
   const PTS_BASKET = 2;
   const PTS_SWISH = 3;
   const PTS_LIGHTNING = 5;
+  /* bonus round: unlocked by reaching BONUS_TARGET by the end of the regular rounds (150 per Merit's manuals);
+   * a short timed round with unlimited balls where every basket is worth more. The format is our own. */
+  const BONUS_TARGET = 150;
+  const BONUS = { z: 6.1, cross: 2.6, need: 0, time: 15, reload: 1.1, gap: 0.5, pts: 5, lightning: 8 };
   const JERSEY = '#d9342b';
   const WALL_BOTTOM = 345; /* where the brick wall meets the court */
   const SKIN = ['#8d5524', '#c68642', '#5a3825', '#e0ac69', '#a86b3c'];
@@ -63,14 +67,14 @@
     }
 
     get P() { return this.players[this.turn]; }
-    get R() { return ROUNDS[this.round]; }
+    get R() { return this.inBonus ? BONUS : ROUNDS[this.round]; }
 
     beginTurn() {
       this.state = 'intro';
       this.stateT = 0;
       this.balls = [];
-      this.timeLeft = ROUND_TIME;
-      this.ballsLeft = BALLS;
+      this.timeLeft = this.inBonus ? BONUS.time : ROUND_TIME;
+      this.ballsLeft = this.inBonus ? Infinity : BALLS;
       this.roundMade = 0;
       this.streak = 0;
       this.heat = false;
@@ -201,8 +205,8 @@
     shoot(lane) {
       if (this.gap > 0 || this.reload[lane] > 0 || this.ballsLeft <= 0) return;
       const r = this.R;
-      this.gap = GAP;
-      this.reload[lane] = RELOAD;
+      this.gap = this.inBonus ? BONUS.gap : GAP;
+      this.reload[lane] = this.inBonus ? BONUS.reload : RELOAD;
       this.ballsLeft--;
       const T = this.flightTime();
       const y0 = 1.62;
@@ -223,7 +227,8 @@
     /* ---------- scoring ---------- */
     make(kind) {
       const r = this.R;
-      const pts = this.heat ? PTS_LIGHTNING : kind === 'swish' ? PTS_SWISH : PTS_BASKET;
+      const pts = this.inBonus ? (this.heat ? BONUS.lightning : BONUS.pts) : this.heat ? PTS_LIGHTNING : kind === 'swish' ? PTS_SWISH : PTS_BASKET;
+      if (this.inBonus) this.P.bonusPts = (this.P.bonusPts || 0) + pts;
       this.boardFlash = 1;
       this.streak++;
       this.roundMade++;
@@ -391,6 +396,13 @@
 
     endTurn() {
       const P = this.P;
+      if (this.inBonus) {
+        P.bonusPlayed = true;
+        this.state = 'summary';
+        this.stateT = 0;
+        UT.sfx.win();
+        return;
+      }
       this.qualified = this.roundMade >= this.R.need;
       if (this.qualified) {
         P.rounds = this.round + 1;
@@ -404,6 +416,10 @@
     }
 
     next() {
+      if (this.inBonus) {
+        this.nextBonus();
+        return;
+      }
       for (let i = this.turn + 1; i < this.players.length; i++) {
         if (!this.players[i].out) {
           this.turn = i;
@@ -415,11 +431,25 @@
       const first = this.players.findIndex((p) => !p.out);
       if (this.round >= ROUNDS.length || first < 0) {
         this.round = Math.min(this.round, ROUNDS.length - 1);
-        this.finish();
+        this.nextBonus();
         return;
       }
       this.turn = first;
       this.beginTurn();
+    }
+
+    /* after the regular rounds, everyone at BONUS_TARGET or more plays the bonus round, in turn */
+    nextBonus() {
+      const i = this.players.findIndex((p) => p.score >= BONUS_TARGET && !p.bonusPlayed);
+      if (i < 0) {
+        this.inBonus = false;
+        this.finish();
+        return;
+      }
+      this.inBonus = true;
+      this.turn = i;
+      this.beginTurn();
+      UT.sfx.heat();
     }
 
     finish() {
@@ -436,7 +466,7 @@
           game: 'swish',
           rounds: ROUNDS.length,
           allClear: this.players.some((p) => p.rounds === ROUNDS.length),
-          players: this.players.map((p) => ({ name: p.name, score: p.score, made: p.made, shots: p.shots, rounds: p.rounds })),
+          players: this.players.map((p) => ({ name: p.name, score: p.score, made: p.made, shots: p.shots, rounds: p.rounds, bonus: !!p.bonusPlayed, bonusPts: p.bonusPts || 0 })),
         };
       }
       return this._result;
@@ -788,11 +818,16 @@
       g.fillRect(x + 352, y + 9, 108, 32);
       D.text(g, String(Math.max(this.best, P.score)), x + 452, y + 26, 22, '#ffe9b0', { align: 'right', family: UT.font.display, weight: 400 });
       /* round tag */
-      const tag = 'ROUND ' + (this.round + 1) + '/' + ROUNDS.length + '   BASKETS ' + this.roundMade + '/' + r.need + '   BALLS ' + this.ballsLeft;
+      const tag = this.inBonus ? 'BONUS ROUND   EVERY BASKET ' + BONUS.pts + '   UNLIMITED BALLS' : 'ROUND ' + (this.round + 1) + '/' + ROUNDS.length + '   BASKETS ' + this.roundMade + '/' + r.need + '   BALLS ' + this.ballsLeft;
       g.fillStyle = 'rgba(11,13,16,0.82)';
       D.rrect(g, W / 2 - 170, y + 54, 340, 24, 12);
       g.fill();
-      D.text(g, tag, W / 2, y + 67, 12, this.roundMade >= r.need ? C.mint : '#f3eee3', { weight: 800 });
+      D.text(g, tag, W / 2, y + 67, 12, this.inBonus ? '#ffd23f' : this.roundMade >= r.need ? C.mint : '#f3eee3', { weight: 800 });
+      /* the cabinet's goal line: points still needed for the bonus round */
+      if (!this.inBonus) {
+        const left = BONUS_TARGET - P.score;
+        D.text(g, left > 0 ? left + ' NEEDED FOR BONUS ROUND' : 'BONUS ROUND UNLOCKED!', W / 2, y + 96, 15, left > 0 ? '#c6ff4d' : '#ffd23f', { family: UT.font.display, weight: 400, stroke: '#1a0b08', strokeWidth: 5 });
+      }
       for (let i = 0; i < 3; i++) {
         g.fillStyle = this.heat ? '#7fd8ff' : i < this.streak ? C.amber : 'rgba(255,255,255,0.25)';
         g.beginPath();
@@ -823,6 +858,13 @@
       const r = this.R;
       this.dim(g);
       if (this.players.length > 1) this.shout(g, this.P.name.toUpperCase(), 120, 30, '#5fe3e6');
+      if (this.inBonus) {
+        this.shout(g, 'BONUS ROUND!', 175, 58, '#ffd23f');
+        const bl = [BONUS.time + ' seconds · unlimited balls · no quota', 'Every basket ' + BONUS.pts + ' · lightning baskets ' + BONUS.lightning, 'The hoop moves faster. Fire away!'];
+        bl.forEach((t, i) => D.text(g, t, this.W / 2, 232 + i * 26, i ? 15 : 17, i ? '#f3eee3' : '#ffd23f', { weight: 700, stroke: '#1a0b08', strokeWidth: 4 }));
+        if (this.stateT > 0.35) D.text(g, 'TAP TO START', this.W / 2, 330, 18, '#5fe3e6', { weight: 800, stroke: '#1a0b08', strokeWidth: 4 });
+        return;
+      }
       this.shout(g, 'ROUND ' + (this.round + 1), 175, 58, '#f3eee3');
       const lines = ['Hoop at ' + r.z.toFixed(1) + ' m · make ' + r.need + ' of ' + BALLS + ' before the shot clock hits 00', 'Tap a shooter just before the hoop slides over his lane', 'Basket ' + PTS_BASKET + ' · swish ' + PTS_SWISH + ' · 3 in a row = LIGHTNING: ' + PTS_LIGHTNING + ' a basket'];
       lines.forEach((t, i) => D.text(g, t, this.W / 2, 232 + i * 26, i ? 15 : 17, i ? '#f3eee3' : '#ffd23f', { weight: 700, stroke: '#1a0b08', strokeWidth: 4 }));
@@ -832,8 +874,15 @@
     drawSummary(g) {
       const r = this.R;
       this.dim(g);
+      if (this.inBonus) {
+        this.shout(g, 'BONUS ROUND OVER', 190, 52, '#ffd23f');
+        D.text(g, this.roundMade + ' baskets · +' + (this.P.bonusPts || 0) + ' bonus points · ' + this.P.name + ' total ' + this.P.score, this.W / 2, 245, 17, '#f3eee3', { weight: 700, stroke: '#1a0b08', strokeWidth: 4 });
+        if (this.stateT > 0.8) D.text(g, 'TAP TO CONTINUE', this.W / 2, 285, 17, '#5fe3e6', { weight: 800, stroke: '#1a0b08', strokeWidth: 4 });
+        return;
+      }
       this.shout(g, this.qualified ? 'NICE SHOOTING!' : 'MISSED THE CUT', 190, 52, this.qualified ? '#f3eee3' : C.coral);
       D.text(g, this.roundMade + ' baskets · needed ' + r.need + ' · ' + this.P.name + ' total ' + this.P.score, this.W / 2, 245, 17, '#ffd23f', { weight: 700, stroke: '#1a0b08', strokeWidth: 4 });
+      if (!this.qualified && this.P.score >= BONUS_TARGET) D.text(g, 'You still earned the bonus round!', this.W / 2, 318, 15, '#c6ff4d', { weight: 800, stroke: '#1a0b08', strokeWidth: 4 });
       if (this.stateT > 0.8) D.text(g, 'TAP TO CONTINUE', this.W / 2, 285, 17, '#5fe3e6', { weight: 800, stroke: '#1a0b08', strokeWidth: 4 });
     }
 
@@ -850,4 +899,5 @@
   UT.Swish = Swish;
   UT.Swish.ROUNDS = ROUNDS;
   UT.Swish.LANES = LANES;
+  UT.Swish.BONUS_TARGET = BONUS_TARGET;
 })();
