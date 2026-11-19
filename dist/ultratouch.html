@@ -1673,6 +1673,10 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
   const ROUNDS = 2;
   const BONUS_TARGET = 80000;
   const BOARD_CLEAR = 10000;
+  /* time bonus (measured from arcade footage): when a round ends early, every timer dot still lit is worth
+   * 200 points, so a full 20-dot clock is worth 4,000; the dots drain into the score, then the bar reads the total */
+  const DOT_BONUS = 200;
+  const TALLY_TIME = 1.2;
   const PER_DECK_CARD = 1000; /* for every card still left in the deck when the board is cleared */
   const DOTS = 20;
   const FRAME = '#2a1650';
@@ -1723,6 +1727,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       this.lastTick = 11;
       this.reason = '';
       this.cleared = null;
+      this.timeBonus = 0;
       this.newBoard();
       this.state = 'intro';
       this.stateT = 0;
@@ -1899,6 +1904,20 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 
     /* end of a round: on to the next round, the bonus round, or game over */
     endRound(reason) {
+      this.sel = null;
+      const dotsLeft = (this.timeLeft / this.timeMax) * DOTS;
+      this.timeBonus = this.timeLeft > 0 ? Math.round((dotsLeft * DOT_BONUS) / 50) * 50 : 0;
+      if (this.timeBonus > 0) {
+        /* drain the remaining dots into the score first, then show the round summary */
+        this.state = 'tally';
+        this.stateT = 0;
+        this.tally = { reason, base: this.score, from: this.timeLeft, lastDot: Math.ceil(dotsLeft) };
+        return;
+      }
+      this.finishRound(reason);
+    }
+
+    finishRound(reason) {
       this.state = 'roundEnd';
       this.stateT = 0;
       this.reason = reason;
@@ -1986,6 +2005,18 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
         this.stateT = 0;
       }
       if (this.state === 'cleared' && this.stateT > 1.6) this.dealNextBoard();
+      if (this.state === 'tally') {
+        const k = Math.min(1, this.stateT / TALLY_TIME);
+        this.timeLeft = this.tally.from * (1 - k);
+        this.score = this.tally.base + Math.round((this.timeBonus * k) / 50) * 50;
+        const dot = Math.ceil((this.timeLeft / this.timeMax) * DOTS);
+        if (dot < this.tally.lastDot) { this.tally.lastDot = dot; UT.sfx.tick(); }
+        if (k >= 1) {
+          this.score = this.tally.base + this.timeBonus;
+          UT.sfx.match(4);
+          this.finishRound(this.tally.reason);
+        }
+      }
       if (this.state === 'play') {
         this.speedT += dt;
         this.timeLeft -= dt;
@@ -2143,7 +2174,9 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       g.lineTo(tx - 12, 57);
       g.stroke();
       const lit = Math.ceil((this.timeLeft / this.timeMax) * DOTS);
-      for (let i = 0; i < DOTS; i++) {
+      const showBonus = this.state === 'roundEnd' && this.timeBonus > 0;
+      if (showBonus) D.text(g, 'TIME BONUS ' + this.timeBonus.toLocaleString(), tx + tw / 2, 58, 13, '#3ddc97', { family: UT.font.display, weight: 400 });
+      for (let i = 0; i < DOTS && !showBonus; i++) {
         const on = i >= DOTS - lit;
         const f = i / DOTS;
         g.fillStyle = !on ? '#2a2540' : f < 0.2 ? '#ff4d5e' : f < 0.45 ? '#ffd23f' : '#3ddc97';
@@ -2203,7 +2236,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       /* speed bonus meter: refills on every match, then drains; its value is added to the next match */
       const m = L.meter;
       const v = this.state === 'play' ? this.speed : SPEED_MAX;
-      D.text(g, 'SPEED BONUS', m.x + m.w / 2, m.y - 10, 10, C.dim, { weight: 800 });
+      D.text(g, 'MATCH BONUS', m.x + m.w / 2, m.y - 10, 10, C.dim, { weight: 800 });
       g.fillStyle = '#12301f';
       D.rrect(g, m.x, m.y + 8, m.w, m.h, 10);
       g.fill();
@@ -2292,7 +2325,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       D.text(g, 'PAIR (same rank) ' + PAIR_PTS.toLocaleString() + '   RUN (one up or down, K-A too) ' + RUN_PTS + '   + the speed bonus', cx, y + 114, 14, C.amber, { weight: 700 });
       D.text(g, 'Only uncovered cards can be taken. The dealt card counts. NEXT CARD −' + DEAL_COST + '.', cx, y + 140, 14, C.dim, { weight: 500 });
       D.text(g, 'Match fast: the green meter (up to ' + SPEED_MAX + ') is added to each match.', cx, y + 162, 14, C.dim, { weight: 500 });
-      D.text(g, 'Score over ' + BONUS_TARGET.toLocaleString() + ' after round ' + ROUNDS + ' earns a bonus round. TAKE SCORE ends the round.', cx, y + 184, 14, C.dim, { weight: 500 });
+      D.text(g, 'Finish early for ' + DOT_BONUS + ' per timer dot left. Over ' + BONUS_TARGET.toLocaleString() + ' after round ' + ROUNDS + ' earns a bonus round.', cx, y + 184, 14, C.dim, { weight: 500 });
       if (this.stateT > 0.3) D.text(g, 'TAP TO DEAL', cx, y + 228, 16, C.amber, { weight: 800 });
     }
 
@@ -2311,7 +2344,8 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
     }
 
     drawRoundEnd(g) {
-      const extra = this.cleared ? 48 : 0;
+      const tb = this.timeBonus > 0 ? 24 : 0;
+      const extra = (this.cleared ? 48 : 0) + tb;
       const { y: y0 } = this.panel(g, 480, 220 + extra);
       const cx = this.W / 2;
       const title = this.next === 'over' ? 'GAME OVER' : this.next === 'bonus' ? 'BONUS ROUND!' : 'ROUND ' + this.round + ' DONE';
@@ -2321,6 +2355,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
         D.text(g, 'Round bonus  +' + this.cleared.bonus.toLocaleString(), cx, y0 + 114, 15, C.text, { weight: 600 });
         D.text(g, 'Cards left in the deck  +' + this.cleared.deck.toLocaleString() + '  (' + (this.cleared.deck / PER_DECK_CARD) + ' × ' + PER_DECK_CARD.toLocaleString() + ')', cx, y0 + 136, 15, C.text, { weight: 600 });
       }
+      if (tb) D.text(g, 'Time bonus  +' + this.timeBonus.toLocaleString() + '  (' + DOT_BONUS + ' per timer dot left)', cx, y0 + 114 + (this.cleared ? 44 : 0), 15, '#3ddc97', { weight: 700 });
       const y = y0 + extra;
       D.text(g, 'Score ' + this.score.toLocaleString(), cx, y + 120, 22, C.amber, { weight: 800 });
       let sub = '';
