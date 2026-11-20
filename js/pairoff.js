@@ -1,5 +1,5 @@
 /* Pair Off — a speed card-clearing game.
- * Board: 28 face-up cards in five overlapping brick rows (6-5-6-5-6). A card is open once every card
+ * Board: face-up cards in overlapping brick rows: 6-5-6-5-6 (28) in round 1, plus a row of 5 (33) from round 2. A card is open once every card
  * overlapping it from the row below is gone. Take two open cards that are a PAIR (same rank) or a RUN
  * (one apart, up or down). Pairs pay more than runs. The dealt card counts as open; tapping NEXT CARD deals
  * another for a cost. Mechanics follow the bar-top classic; art and presentation are our own. */
@@ -12,7 +12,9 @@
   const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
   const SUITS = ['♠', '♥', '♦', '♣'];
   const RED = [false, true, true, false];
-  const ROW_SIZES = [6, 5, 6, 5, 6];
+  /* round 1 deals five rows; round 2 and the bonus round add one more row of 5 (per players who knew the machine) */
+  const ROWS_FIRST = [6, 5, 6, 5, 6];
+  const ROWS_LATER = [6, 5, 6, 5, 6, 5];
   const RUN_PTS = 400;
   const PAIR_PTS = 1200;
   const DEAL_COST = 100;
@@ -64,6 +66,9 @@
       this.score = 0;
       this.runs = 0;
       this.pairsMade = 0;
+      this.totalRuns = 0;
+      this.totalPairs = 0;
+      this.rows = ROWS_FIRST;
       this.best = UT.scores.best('pairoff');
       this.popups = new UT.Popups();
       this.W = 960;
@@ -83,18 +88,23 @@
       this.reason = '';
       this.cleared = null;
       this.timeBonus = 0;
+      /* the run/pair counters on the left count this round only */
+      this.runs = 0;
+      this.pairsMade = 0;
+      this.rows = this.round === 1 ? ROWS_FIRST : ROWS_LATER;
+      if (this.L) this.resize(this.W, this.H);
       this.newBoard();
       this.state = 'intro';
       this.stateT = 0;
     }
 
-    /* a fresh 28-card board; the round clock keeps running */
+    /* a fresh board for the round */
     newBoard() {
       this.boards++;
       const deck = shuffled();
       this.slots = [];
       let n = 0;
-      ROW_SIZES.forEach((size, r) => {
+      this.rows.forEach((size, r) => {
         for (let i = 0; i < size; i++) {
           this.slots.push({ card: deck.pop(), r, i, gone: false, deal: n * 0.03 });
           n++;
@@ -118,7 +128,7 @@
       const head = 78;
       const foot = 112;
       const side = 132;
-      const byH = (H - head - foot - 14) / 3; /* five rows, each half-overlapping the last */
+      const byH = (H - head - foot - 14) / (1 + 0.5 * ((this.rows || ROWS_FIRST).length - 1)); /* rows half-overlap the one above */
       const byW = ((W - 2 * side - 20) / 6 - 6) * 1.4;
       const ch = Math.round(Math.min(byH, byW, 130));
       const cw = Math.round(ch / 1.4);
@@ -141,19 +151,19 @@
 
     slotXY(s) {
       const L = this.L;
-      const off = ROW_SIZES[s.r] === 5 ? 0.5 : 0;
+      const off = this.rows[s.r] === 5 ? 0.5 : 0;
       return { x: L.fx + (s.i + off) * L.dx, y: L.fy + s.r * L.dy };
     }
     slotAt(r, i) {
-      if (r < 0 || r >= ROW_SIZES.length || i < 0 || i >= ROW_SIZES[r]) return null;
+      if (r < 0 || r >= this.rows.length || i < 0 || i >= this.rows[r]) return null;
       let k = 0;
-      for (let q = 0; q < r; q++) k += ROW_SIZES[q];
+      for (let q = 0; q < r; q++) k += this.rows[q];
       return this.slots[k + i];
     }
     /* the cards in the next row that overlap this one */
     coverers(s) {
-      if (s.r === ROW_SIZES.length - 1) return [];
-      return ROW_SIZES[s.r] === 6 ? [this.slotAt(s.r + 1, s.i - 1), this.slotAt(s.r + 1, s.i)].filter(Boolean) : [this.slotAt(s.r + 1, s.i), this.slotAt(s.r + 1, s.i + 1)].filter(Boolean);
+      if (s.r === this.rows.length - 1) return [];
+      return this.rows[s.r] === 6 ? [this.slotAt(s.r + 1, s.i - 1), this.slotAt(s.r + 1, s.i)].filter(Boolean) : [this.slotAt(s.r + 1, s.i), this.slotAt(s.r + 1, s.i + 1)].filter(Boolean);
     }
     isOpen(s) { return !s.gone && this.coverers(s).every((c) => c.gone); }
     remaining() { return this.slots.reduce((n, s) => n + (s.gone ? 0 : 1), 0) + this.held.length; }
@@ -197,8 +207,8 @@
       const speed = this.speed;
       const pts = (kind === 'pair' ? PAIR_PTS : RUN_PTS) + speed;
       this.speedT = 0;
-      if (kind === 'pair') this.pairsMade++;
-      else this.runs++;
+      if (kind === 'pair') { this.pairsMade++; this.totalPairs++; }
+      else { this.runs++; this.totalRuns++; }
       this.score += pts;
       const pa = this.posOf(a);
       const pb = this.posOf(b);
@@ -331,7 +341,7 @@
     }
 
     result() {
-      if (!this._result) this._result = { game: 'pairoff', score: this.score, round: this.round, bonus: this.bonusRound, boards: this.boards, pairs: this.pairsMade, runs: this.runs, reason: this.reason };
+      if (!this._result) this._result = { game: 'pairoff', score: this.score, round: this.round, bonus: this.bonusRound, boards: this.boards, pairs: this.totalPairs, runs: this.totalRuns, reason: this.reason };
       return this._result;
     }
 
@@ -676,7 +686,7 @@
       const { y } = this.panel(g, 520, 256);
       const cx = this.W / 2;
       D.text(g, this.bonusRound ? 'BONUS ROUND!' : 'ROUND ' + this.round + ' OF ' + ROUNDS, cx, y + 44, 36, this.bonusRound ? C.amber : '#7ff0d0', { family: UT.font.display, weight: 400 });
-      D.text(g, this.bonusRound ? 'You beat ' + BONUS_TARGET.toLocaleString() + '. One more ' + ROUND_TIME + '-second round.' : 'Clear all 28 cards in ' + ROUND_TIME + ' s: +' + BOARD_CLEAR.toLocaleString() + ' and +' + PER_DECK_CARD.toLocaleString() + ' per card left in the deck.', cx, y + 84, 16, C.text, { weight: 600 });
+      D.text(g, this.bonusRound ? 'You beat ' + BONUS_TARGET.toLocaleString() + '. One more ' + ROUND_TIME + '-second round.' : 'Clear all ' + this.slots.length + ' cards in ' + ROUND_TIME + ' s: +' + BOARD_CLEAR.toLocaleString() + ' and +' + PER_DECK_CARD.toLocaleString() + ' per card left in the deck.', cx, y + 84, 16, C.text, { weight: 600 });
       D.text(g, 'PAIR (same rank) ' + PAIR_PTS.toLocaleString() + '   RUN (one up or down, K-A too) ' + RUN_PTS + '   + the speed bonus', cx, y + 114, 14, C.amber, { weight: 700 });
       D.text(g, 'Only uncovered cards can be taken. The dealt card counts. NEXT CARD −' + DEAL_COST + '.', cx, y + 140, 14, C.dim, { weight: 500 });
       D.text(g, 'Match fast: the green meter (up to ' + SPEED_MAX + ') is added to each match.', cx, y + 162, 14, C.dim, { weight: 500 });
