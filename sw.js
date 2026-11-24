@@ -1,6 +1,6 @@
 /* Offline cache for UltraTouch. Bump VERSION when shipping changes. */
-const VERSION = 'ut-32dee71497';
-const FILES = ['./', 'index.html', 'css/style.css', 'js/core.js', 'js/swish.js', 'js/pairoff.js', 'js/fizz21.js', 'js/leaderboard-config.js', 'js/leaderboard.js', 'js/app.js',
+const VERSION = 'ut-54e8a8d91d';
+const FILES = ['./', 'index.html', 'css/style.css', 'js/core.js', 'js/swish.js', 'js/pairoff.js', 'js/fizz21.js', 'js/streak21.js', 'js/leaderboard-config.js', 'js/leaderboard.js', 'js/app.js',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));

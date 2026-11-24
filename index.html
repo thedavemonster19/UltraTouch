@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Permanent+Marker&family=Rubik:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="css/style.css?v=32dee71497">
+<link rel="stylesheet" href="css/style.css?v=54e8a8d91d">
 </head>
 <body>
 <div id="app">
@@ -28,7 +28,7 @@
     <section class="brand">
       <p class="eyebrow">Bar-top classics · pocket edition</p>
       <h1 class="marquee">Ultra<span>Touch</span></h1>
-      <p class="lede">Three quick games for your phone, held either way. Tap fast, chase your best score.</p>
+      <p class="lede">Four bar-top games for your phone, held either way. Tap fast, chase your best score.</p>
       <div class="brand-actions">
         <button id="btn-fullscreen" class="chip" type="button" hidden>Full screen</button>
         <button id="btn-sound" class="chip" type="button" aria-pressed="true">Sound on</button>
@@ -122,6 +122,28 @@
           </div>
         </div>
       </article>
+      <article class="tile tile-streak">
+        <svg class="art" viewBox="0 0 220 120" aria-hidden="true">
+          <rect width="220" height="120" fill="#16285a"/>
+          <g stroke="rgba(77,225,255,.15)"><path d="M0 40h220M0 80h220M40 0v120M80 0v120M120 0v120M160 0v120M200 0v120"/></g>
+          <g transform="translate(30 22)"><rect width="40" height="56" rx="5" fill="#fff"/><text x="6" y="17" font-family="Rubik, sans-serif" font-weight="800" font-size="14" fill="#14213d">K</text><text x="20" y="44" font-size="20" text-anchor="middle" fill="#14213d">♣</text></g>
+          <g transform="translate(30 44)"><rect width="40" height="56" rx="5" fill="#fff" stroke="#b8c2d6"/><text x="6" y="17" font-family="Rubik, sans-serif" font-weight="800" font-size="14" fill="#e0245e">A</text><text x="20" y="44" font-size="20" text-anchor="middle" fill="#e0245e">♥</text></g>
+          <text x="98" y="62" font-family="Bungee, sans-serif" font-size="30" fill="#fff" stroke="#ff4fa0" stroke-width="2">21!</text>
+          <rect x="150" y="30" width="58" height="62" rx="10" fill="#0f1d3a" stroke="#ff4fa0" stroke-width="2"/>
+          <text x="179" y="52" font-family="Rubik, sans-serif" font-weight="800" font-size="9" text-anchor="middle" fill="#4de1ff">NEXT 21</text>
+          <text x="179" y="78" font-family="Bungee, sans-serif" font-size="15" text-anchor="middle" fill="#fff">5,000</text>
+        </svg>
+        <div class="tile-body">
+          <h2>Streak 21</h2>
+          <p>Build 21s in four columns. Every 21 in a row pays 1,000 more. A skip resets the streak.</p>
+          <div class="players"><span class="label">Solo · bonus deck at 150k</span></div>
+          <p class="champ" id="champ-streak21" hidden><span class="champ-tag">#1</span> <b class="champ-name"></b> <span class="champ-score"></span></p>
+          <div class="tile-foot">
+            <span class="best">Your best <b id="best-streak21">—</b></span>
+            <button type="button" class="play" data-game="streak21">Play</button>
+          </div>
+        </div>
+      </article>
     </section>
     </div>
   </main>
@@ -139,12 +161,13 @@
   </div>
 
 </div>
-<script src="js/core.js?v=32dee71497"></script>
-<script src="js/swish.js?v=32dee71497"></script>
-<script src="js/pairoff.js?v=32dee71497"></script>
-<script src="js/fizz21.js?v=32dee71497"></script>
-<script src="js/leaderboard-config.js?v=32dee71497"></script>
-<script src="js/leaderboard.js?v=32dee71497"></script>
-<script src="js/app.js?v=32dee71497"></script>
+<script src="js/core.js?v=54e8a8d91d"></script>
+<script src="js/swish.js?v=54e8a8d91d"></script>
+<script src="js/pairoff.js?v=54e8a8d91d"></script>
+<script src="js/fizz21.js?v=54e8a8d91d"></script>
+<script src="js/streak21.js?v=54e8a8d91d"></script>
+<script src="js/leaderboard-config.js?v=54e8a8d91d"></script>
+<script src="js/leaderboard.js?v=54e8a8d91d"></script>
+<script src="js/app.js?v=54e8a8d91d"></script>
 </body>
 </html>

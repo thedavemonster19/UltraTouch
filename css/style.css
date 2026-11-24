@@ -112,7 +112,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 
 .tiles {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: clamp(10px, 2vw, 20px);
   min-width: 0;
 }
@@ -171,6 +171,14 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 .tile-fizz .champ-score { color: var(--coral); }
 .tile-fizz .champ-tag { background: var(--coral); color: #fff; }
 .split3 { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.split4 { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.split4 .scores { font-size: 12px; }
+.tile-streak { box-shadow: 0 0 0 1px rgba(255, 79, 160, 0.2), 0 12px 30px rgba(0, 0, 0, 0.35); }
+.tile-streak h2 { color: #ff4fa0; }
+.tile-streak .play { background: #ff4fa0; color: #fff; box-shadow: 0 4px 0 #b02a6c; }
+.tile-streak .champ-score { color: #ff4fa0; }
+.tile-streak .champ-tag { background: #ff4fa0; color: #fff; }
+.lb-board.streak h3 { color: #ff4fa0; }
 .lb-board.fizz h3 { color: var(--coral); }
 .play:active { transform: translateY(3px); box-shadow: none; }
 
