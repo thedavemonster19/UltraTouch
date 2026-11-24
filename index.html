@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Permanent+Marker&family=Rubik:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="css/style.css?v=c7e15e5588">
+<link rel="stylesheet" href="css/style.css?v=32dee71497">
 </head>
 <body>
 <div id="app">
@@ -28,7 +28,7 @@
     <section class="brand">
       <p class="eyebrow">Bar-top classics · pocket edition</p>
       <h1 class="marquee">Ultra<span>Touch</span></h1>
-      <p class="lede">Two quick games for your phone, held either way. Tap fast, chase your best score.</p>
+      <p class="lede">Three quick games for your phone, held either way. Tap fast, chase your best score.</p>
       <div class="brand-actions">
         <button id="btn-fullscreen" class="chip" type="button" hidden>Full screen</button>
         <button id="btn-sound" class="chip" type="button" aria-pressed="true">Sound on</button>
@@ -102,6 +102,26 @@
           </div>
         </div>
       </article>
+      <article class="tile tile-fizz">
+        <svg class="art" viewBox="0 0 220 120" aria-hidden="true">
+          <rect width="220" height="120" fill="#f3e7cf"/>
+          <rect y="0" width="220" height="22" fill="#1aa6a0"/>
+          <g fill="#e2412f"><rect x="0" y="104" width="16" height="8"/><rect x="32" y="104" width="16" height="8"/><rect x="64" y="104" width="16" height="8"/><rect x="96" y="104" width="16" height="8"/><rect x="128" y="104" width="16" height="8"/><rect x="160" y="104" width="16" height="8"/><rect x="192" y="104" width="16" height="8"/><rect x="16" y="112" width="16" height="8"/><rect x="48" y="112" width="16" height="8"/><rect x="80" y="112" width="16" height="8"/><rect x="112" y="112" width="16" height="8"/><rect x="144" y="112" width="16" height="8"/><rect x="176" y="112" width="16" height="8"/><rect x="208" y="112" width="12" height="8"/></g>
+          <g transform="translate(46 34)"><path d="M4 18h36l-5 50H9z" fill="#8a3b1d" stroke="#fff" stroke-width="2"/><circle cx="10" cy="16" r="8" fill="#fff6e3"/><circle cx="22" cy="13" r="9" fill="#fff6e3"/><circle cx="34" cy="16" r="8" fill="#fff6e3"/><text x="22" y="19" font-family="Bungee, sans-serif" font-size="13" text-anchor="middle" fill="#e2412f">10</text></g>
+          <g transform="translate(94 28)"><path d="M4 18h36l-5 56H9z" fill="#f08a24" stroke="#fff" stroke-width="2"/><circle cx="10" cy="16" r="8" fill="#ffe680"/><circle cx="22" cy="13" r="9" fill="#ffe680"/><circle cx="34" cy="16" r="8" fill="#ffe680"/><text x="22" y="20" font-family="Bungee, sans-serif" font-size="14" text-anchor="middle" fill="#7b4fd6">A</text></g>
+          <g transform="translate(142 38)"><path d="M4 18h36l-5 46H9z" fill="#6bbf3a" stroke="#fff" stroke-width="2"/><circle cx="10" cy="16" r="8" fill="#fff6e3"/><circle cx="22" cy="13" r="9" fill="#fff6e3"/><circle cx="34" cy="16" r="8" fill="#fff6e3"/><text x="22" y="19" font-family="Bungee, sans-serif" font-size="13" text-anchor="middle" fill="#e2412f">21</text></g>
+        </svg>
+        <div class="tile-body">
+          <h2>Fizz 21</h2>
+          <p>Pour glasses into five columns without going over 21. The closer your total gets to 105, the bigger the payout.</p>
+          <div class="players"><span class="label">Solo · 3 hands</span></div>
+          <p class="champ" id="champ-fizz21" hidden><span class="champ-tag">#1</span> <b class="champ-name"></b> <span class="champ-score"></span></p>
+          <div class="tile-foot">
+            <span class="best">Your best <b id="best-fizz21">—</b></span>
+            <button type="button" class="play" data-game="fizz21">Play</button>
+          </div>
+        </div>
+      </article>
     </section>
     </div>
   </main>
@@ -119,11 +139,12 @@
   </div>
 
 </div>
-<script src="js/core.js?v=c7e15e5588"></script>
-<script src="js/swish.js?v=c7e15e5588"></script>
-<script src="js/pairoff.js?v=c7e15e5588"></script>
-<script src="js/leaderboard-config.js?v=c7e15e5588"></script>
-<script src="js/leaderboard.js?v=c7e15e5588"></script>
-<script src="js/app.js?v=c7e15e5588"></script>
+<script src="js/core.js?v=32dee71497"></script>
+<script src="js/swish.js?v=32dee71497"></script>
+<script src="js/pairoff.js?v=32dee71497"></script>
+<script src="js/fizz21.js?v=32dee71497"></script>
+<script src="js/leaderboard-config.js?v=32dee71497"></script>
+<script src="js/leaderboard.js?v=32dee71497"></script>
+<script src="js/app.js?v=32dee71497"></script>
 </body>
 </html>

@@ -57,13 +57,14 @@
   window.addEventListener('orientationchange', () => setTimeout(fitViewport, 350));
   window.addEventListener('pageshow', fitViewport);
   fitViewport();
-  const NAMES = { swish: 'Swish Shot', pairoff: 'Pair Off' };
+  const NAMES = { swish: 'Swish Shot', pairoff: 'Pair Off', fizz21: 'Fizz 21' };
+  const GAMES = ['swish', 'pairoff', 'fizz21'];
   let current = null; /* { game, opts } */
   let swishPlayers = UT.clamp(UT.store.get('swishPlayers', 1), 1, 4);
 
   /* ---------- hub ---------- */
   function refreshBest() {
-    ['swish', 'pairoff'].forEach((g) => {
+    GAMES.forEach((g) => {
       const b = UT.scores.best(g);
       $('#best-' + g).textContent = b ? b.toLocaleString() : '—';
     });
@@ -79,9 +80,9 @@
   }
   async function refreshChamps() {
     if (!UT.lb.enabled) return;
-    ['swish', 'pairoff'].forEach((g) => showChamp(g, UT.store.get('champ:' + g, null)));
+    GAMES.forEach((g) => showChamp(g, UT.store.get('champ:' + g, null)));
     fitHub();
-    for (const g of ['swish', 'pairoff']) {
+    for (const g of GAMES) {
       try {
         const top = (await UT.lb.top(g, 1))[0] || null;
         UT.store.set('champ:' + g, top);
@@ -158,7 +159,7 @@
     current = { game };
     const onRecord = (result) => record(result);
     const onEnd = (result) => setTimeout(() => results(result), 50);
-    const make = () => (game === 'swish' ? new UT.Swish({ players: swishPlayers, onEnd, onRecord }) : new UT.PairOff({ onEnd, onRecord }));
+    const make = () => (game === 'swish' ? new UT.Swish({ players: swishPlayers, onEnd, onRecord }) : game === 'fizz21' ? new UT.Fizz21({ onEnd, onRecord }) : new UT.PairOff({ onEnd, onRecord }));
     const fontsReady = document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 1200))]) : Promise.resolve();
     fontsReady.then(() => stage.run(make()));
   }
@@ -252,6 +253,9 @@
         const rank = UT.scores.add('swish', p.score, label);
         if (rank >= 0) ranks.push(rank);
       });
+    } else if (r.game === 'fizz21') {
+      const rank = UT.scores.add('fizz21', r.score, 'Best total ' + r.best);
+      if (rank >= 0) ranks.push(rank);
     } else {
       const rank = UT.scores.add('pairoff', r.score, r.bonus ? 'Bonus round' : 'Round ' + r.round);
       if (rank >= 0) ranks.push(rank);
@@ -281,6 +285,9 @@
         });
         body += '</div>';
       }
+    } else if (r.game === 'fizz21') {
+      body += '<div class="big-score">' + r.score.toLocaleString() + '</div>';
+      body += '<p class="note">Hand totals ' + r.hands.join(' · ') + ' (97 or more pays)</p>';
     } else {
       body += '<div class="big-score">' + r.score.toLocaleString() + '</div>';
       body += '<p class="note">' + esc(r.reason) + ' · ' + (r.bonus ? 'played the bonus round' : 'round ' + r.round + ' of 2') + ' · ' + r.boards + (r.boards === 1 ? ' board' : ' boards') + ' · ' + r.pairs + ' pairs, ' + r.runs + ' runs</p>';
@@ -288,7 +295,7 @@
     if (ranks.includes(0)) body = '<p class="center"><span class="badge">NEW BEST</span></p>' + body;
     body = '<div class="split"><div class="summary">' + body + '</div><div class="board"><p class="note">Top scores on this device</p>' + tableHtml(r.game, ranks) + '</div></div>';
     if (UT.lb.enabled) body += postHtml(r);
-    sheet(r.game === 'swish' ? 'Final buzzer' : 'Cards down', body, [
+    sheet(r.game === 'swish' ? 'Final buzzer' : r.game === 'fizz21' ? 'Last call' : 'Cards down', body, [
       { label: 'Play again', primary: true, run: () => start(r.game) },
       { label: 'Menu', run: toHub },
     ]);
@@ -297,7 +304,7 @@
 
   /* ---------- shared leaderboard ---------- */
   function scorers(r) {
-    return r.game === 'swish' ? r.players.map((p) => ({ label: p.name, score: p.score, detail: p.bonus ? 'Bonus round' : r.players.length > 1 ? p.made + '/' + p.shots : 'Round ' + Math.min(p.rounds + 1, r.rounds) })) : [{ label: 'You', score: r.score, detail: r.bonus ? 'Bonus round' : 'Round ' + r.round }];
+    return r.game === 'swish' ? r.players.map((p) => ({ label: p.name, score: p.score, detail: p.bonus ? 'Bonus round' : r.players.length > 1 ? p.made + '/' + p.shots : 'Round ' + Math.min(p.rounds + 1, r.rounds) })) : r.game === 'fizz21' ? [{ label: 'You', score: r.score, detail: 'Best total ' + r.best }] : [{ label: 'You', score: r.score, detail: r.bonus ? 'Bonus round' : 'Round ' + r.round }];
   }
   function postHtml(r) {
     const who = scorers(r);
@@ -333,7 +340,7 @@
       setTimeout(async () => {
         try {
           const rk = await UT.lb.rankOf(r.game, names[0], who[0].score);
-          const board = r.game === 'swish' ? 'Swish Shot' : 'Pair Off';
+          const board = NAMES[r.game];
           status.textContent = rk ? (rk.rank <= 10 ? names[0] + ' made the ' + board + ' top 10 at #' + rk.rank + '!' : names[0] + '\'s ' + rk.score.toLocaleString() + ' is #' + rk.rank + ' of ' + rk.of + ' ' + board + ' scores.') : 'Posted! It can take a few seconds to show on the board.';
         } catch (e) { status.textContent = 'Posted! Open Leaderboard on the menu to see it.'; }
       }, 2500);
@@ -349,7 +356,7 @@
     UT.sfx.tap();
     const col = (cls, title, id) => '<div class="board lb-board ' + cls + '"><h3>' + title + '</h3><div id="' + id + '"><p class="note">Loading…</p></div></div>';
     const note = UT.lb.enabled ? '<p class="note">Top 10 scores of all time. Post yours from the game-over screen.</p>' : '<p class="note">The shared board isn\'t switched on yet. Showing this phone\'s top scores.</p>';
-    sheet('Leaderboard', note + '<div class="split">' + col('swish', 'Swish Shot', 'lb-swish') + col('pair', 'Pair Off', 'lb-pair') + '</div>', [
+    sheet('Leaderboard', note + '<div class="split split3">' + col('swish', 'Swish Shot', 'lb-swish') + col('pair', 'Pair Off', 'lb-pair') + col('fizz', 'Fizz 21', 'lb-fizz') + '</div>', [
       { label: 'Refresh', run: () => { UT.lb.refresh(); openLeaders(); } },
       { label: 'Close', primary: true, run: closeSheet },
     ]);
@@ -357,9 +364,10 @@
     if (!UT.lb.enabled) {
       fill('lb-swish', tableHtml('swish', []) || '<p class="note">No scores yet.</p>');
       fill('lb-pair', tableHtml('pairoff', []) || '<p class="note">No scores yet.</p>');
+      fill('lb-fizz', tableHtml('fizz21', []) || '<p class="note">No scores yet.</p>');
       return;
     }
-    for (const [game, id] of [['swish', 'lb-swish'], ['pairoff', 'lb-pair']]) {
+    for (const [game, id] of [['swish', 'lb-swish'], ['pairoff', 'lb-pair'], ['fizz21', 'lb-fizz']]) {
       try { fill(id, boardHtml(await UT.lb.top(game, 10))); } catch (e) { fill(id, '<p class="note">Couldn\'t load the board. Check your connection and tap Refresh.</p>'); }
     }
   }

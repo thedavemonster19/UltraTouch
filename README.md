@@ -1,11 +1,12 @@
 # UltraTouch
 
-Two bar-top style touch games rebuilt for phone browsers (Android and iOS), playable held either way. Landscape gives the biggest picture:
+Three bar-top style touch games rebuilt for phone browsers (Android and iOS), playable held either way. Landscape gives the biggest picture:
 
 | Game | Inspired by | What you do |
 |---|---|---|
 | **Swish Shot** | *Hoop Jones* (Megatouch) | Street-court look: brick wall with graffiti result words (SWISH, BRICK, AIRBALL) that light up on each shot, a score / shot clock / hi score strip, and shooters from behind in red team jerseys. Five shooters stand in a row. The ball flies straight up its shooter's lane. One hoop glides slowly at a steady speed nearly edge to edge (about 4.3 s per crossing in round 1, 2.85 s by round 5, measured from arcade footage), the ball reaches the rim in about 0.6 s and then sinks slowly through the net,, bouncing off each side, and slides side to side across their lanes. Tap a shooter just before the hoop passes over his lane, so the ball arrives as it crosses. No power meter: it's all timing. 15 balls and 30 s a round, with a basket quota to qualify. The hoop moves back and speeds up over 5 rounds (4.6 → 8.6 m). Baskets score 2 (3 for a clean swish), and the white backboard flashes on each score. Three in a row brings **LIGHTNING**: bolts strike the rim, the backboard glows electric cyan, and every basket is worth 5 until you miss. Reach **150 points** by the end of the regular rounds (the threshold from Merit's manuals; the scoreboard shows "N needed for bonus round" like the cabinet) to unlock the **bonus round**: 15 seconds, unlimited balls, a faster hoop, every basket worth 5 (8 with lightning), no quota. In multiplayer each player who reaches 150 plays it. The bonus-round format itself is our own; the manuals only give the threshold. A WINNER screen closes the game. 1–4 players pass the phone. |
 | **Pair Off** | *Take 2* (Megatouch) | Face-up cards in overlapping brick rows: 6-5-6-5-6 (28 cards) in round 1, and one more row of 5 (33 cards) in round 2 and the bonus round. A card is open once the cards overlapping it from the row below are gone. Take two open cards: a **pair** (same rank) scores 1,200 and a **run** (one up or down, with K–A wrapping round) scores 400, and each match also adds the green **match bonus** meter: it refills to 500 on every match, holds about 1.5 s, then drains about 150 a second to a floor of 50 (all measured from arcade footage). Tallies for each sit on the left and reset every round. The dealt card (bottom, next to NEXT CARD) counts as open. Tapping NEXT CARD costs 100 and sends the unused dealt card up into the board, filling the first gap from the top row down (if nothing has been cleared yet it waits beside the dealt card and drops in at the first gap). A game is **two rounds**, plus a **bonus round** if you're over 80,000 after round 2. Each round is one board on a 2-minute dot timer and ends when the board is cleared or the timer runs out, whichever comes first (or when you're stuck with the deck empty, or tap TAKE SCORE). Clearing the board pays 10,000 + 1,000 per card left in the deck. Ending a round early (clearing, Take Score or getting stuck) also pays a **time bonus** of 200 per timer dot still lit (20 dots, so up to 4,000); the dots drain into the score and the bar shows the total, as measured from arcade footage.  |
+| **Fizz 21** | *Chug 21* (Megatouch) | Pour each numbered glass (2–10, faces 10, A = 1 or 11) into one of five columns without going over 21. A column is done at 21 or after five glasses. Spill (pass) one unwanted glass per hand. The five-column total pays on the cabinet's table: 105 = 1,000, 104 = 500, 103 = 400, 102 = 300, 101 = 250, 100 = 200, 99 = 150, 98 = 100, 97 = 50. A speed bonus starts at 300 and drains 4 a second; it's added to paying hands. A game is 3 hands. Hand count and how the speed bonus scores are our guesses; the rest is from arcade footage and Merit's description. Soda-fountain theme and art are our own. |
 
 No build step: plain HTML, CSS and JS. Canvas games are drawn at a 540-unit-tall logical resolution whose width follows the screen (letterboxed between 760 and 1240 wide), so they fill everything from 4:3 tablets to 19.5:9 phones. The layout is safe-area aware (notch / Dynamic Island).
 
@@ -41,6 +42,7 @@ css/style.css         hub, sheets
 js/core.js            storage, high scores, Web Audio synth, canvas Stage, helpers
 js/swish.js           Swish Shot
 js/pairoff.js         Pair Off
+js/fizz21.js          Fizz 21
 js/app.js             menu, pause/results, leaderboard UI, fullscreen, service worker
 js/leaderboard.js     post to the Google Form, read the Sheet
 js/leaderboard-config.js  form/sheet ids (blank = leaderboard off)
@@ -62,7 +64,7 @@ Exact layouts, timings and point values of the originals aren't published. Every
 
 ## Naming and legal
 
-*Megatouch*, *Hoop Jones* and the cabinet branding belong to the Megatouch owners (Merit → AMI Entertainment). *Take 2* also collides with the *Take-Two Interactive* trademark. Game **mechanics** aren't protected by copyright, but names, logos, art, sound and screen layouts can be. So this project:
+*Megatouch*, *Hoop Jones*, *Chug 21* and the cabinet branding belong to the Megatouch owners (Merit → AMI Entertainment). *Take 2* also collides with the *Take-Two Interactive* trademark. Game **mechanics** aren't protected by copyright, but names, logos, art, sound and screen layouts can be. So this project:
 
 - uses new names (**UltraTouch**, **Swish Shot**, **Pair Off**) and never uses "Megatouch", "Hoop Jones" or "Take 2" in the product,
 - draws all art in code (canvas + inline SVG), synthesizes all sound, and copies no assets or screen layouts,
