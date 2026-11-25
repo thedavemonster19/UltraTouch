@@ -8,7 +8,7 @@
   const E = CFG.entries || {};
 
   /* highest believable score per board; anything above is ignored when reading */
-  const MAX = { 'swish-arcade': 3000, pairoff: 800000, fizz21: 4000, streak21: 1500000 };
+  const MAX = { 'swish-arcade': 3000, pairoff: 800000, fizz21: 20000000, streak21: 1500000 };
   const NAME_MAX = 12;
 
   let cache = null; /* { at, rows } */

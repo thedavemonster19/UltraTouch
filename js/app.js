@@ -257,7 +257,7 @@
       const rank = UT.scores.add('streak21', r.score, r.twentyOnes + ' hands' + (r.bonus ? ' · bonus deck' : ''));
       if (rank >= 0) ranks.push(rank);
     } else if (r.game === 'fizz21') {
-      const rank = UT.scores.add('fizz21', r.score, 'Best total ' + r.best);
+      const rank = UT.scores.add('fizz21', r.score, r.won + (r.won === 1 ? ' hand won' : ' hands won'));
       if (rank >= 0) ranks.push(rank);
     } else {
       const rank = UT.scores.add('pairoff', r.score, r.bonus ? 'Bonus round' : 'Round ' + r.round);
@@ -293,7 +293,7 @@
       body += '<p class="note">' + r.twentyOnes + ' hands cleared · ' + r.busts + ' busts' + (r.bonus ? ' · played the bonus deck' : '') + '</p>';
     } else if (r.game === 'fizz21') {
       body += '<div class="big-score">' + r.score.toLocaleString() + '</div>';
-      body += '<p class="note">Hand totals ' + r.hands.join(' · ') + ' (97 or more pays)</p>';
+      body += '<p class="note">' + r.won + (r.won === 1 ? ' hand won' : ' hands won') + ' · totals ' + r.hands.join(' · ') + ' (97 needed)</p>';
     } else {
       body += '<div class="big-score">' + r.score.toLocaleString() + '</div>';
       body += '<p class="note">' + esc(r.reason) + ' · ' + (r.bonus ? 'played the bonus round' : 'round ' + r.round + ' of 2') + ' · ' + r.boards + (r.boards === 1 ? ' board' : ' boards') + ' · ' + r.pairs + ' pairs, ' + r.runs + ' runs</p>';
@@ -310,7 +310,7 @@
 
   /* ---------- shared leaderboard ---------- */
   function scorers(r) {
-    return r.game === 'swish' ? r.players.map((p) => ({ label: p.name, score: p.score, detail: p.bonus ? 'Bonus round' : r.players.length > 1 ? p.made + '/' + p.shots : 'Round ' + Math.min(p.rounds + 1, r.rounds) })) : r.game === 'fizz21' ? [{ label: 'You', score: r.score, detail: 'Best total ' + r.best }] : r.game === 'streak21' ? [{ label: 'You', score: r.score, detail: r.twentyOnes + ' hands' + (r.bonus ? ' + bonus' : '') }] : [{ label: 'You', score: r.score, detail: r.bonus ? 'Bonus round' : 'Round ' + r.round }];
+    return r.game === 'swish' ? r.players.map((p) => ({ label: p.name, score: p.score, detail: p.bonus ? 'Bonus round' : r.players.length > 1 ? p.made + '/' + p.shots : 'Round ' + Math.min(p.rounds + 1, r.rounds) })) : r.game === 'fizz21' ? [{ label: 'You', score: r.score, detail: r.won + (r.won === 1 ? ' hand won' : ' hands won') }] : r.game === 'streak21' ? [{ label: 'You', score: r.score, detail: r.twentyOnes + ' hands' + (r.bonus ? ' + bonus' : '') }] : [{ label: 'You', score: r.score, detail: r.bonus ? 'Bonus round' : 'Round ' + r.round }];
   }
   function postHtml(r) {
     const who = scorers(r);

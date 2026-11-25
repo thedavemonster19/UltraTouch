@@ -402,7 +402,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
         <div class="tile-body">
           <h2>Fizz 21</h2>
           <p>Pour glasses into five columns without going over 21. The closer your total gets to 105, the bigger the payout.</p>
-          <div class="players"><span class="label">Solo · 3 hands</span></div>
+          <div class="players"><span class="label">Solo · keep going while you hit 97+</span></div>
           <p class="champ" id="champ-fizz21" hidden><span class="champ-tag">#1</span> <b class="champ-name"></b> <span class="champ-score"></span></p>
           <div class="tile-foot">
             <span class="best">Your best <b id="best-fizz21">—</b></span>
@@ -2442,8 +2442,8 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 /* Fizz 21 — a stack-to-21 game across five columns, three hands a game.
  * Mechanics follow the bar-top classic: drop each numbered glass onto any of five columns without going over 21;
  * a column is done at 21 or after five glasses; one unwanted glass may be spilled (passed) per hand; the total
- * of all five columns pays on a table from 97 to 105; a speed bonus drains while you play.
- * Soda-fountain theme, art, name and hand structure are our own. */
+ * of all five columns pays on a table from 97 to 105; a speed bonus drains while you play; hands continue while
+ * you reach 97, and the first miss ends the game. Soda-fountain theme, art and name are our own. */
 (function () {
   'use strict';
   const UT = window.UT;
@@ -2452,7 +2452,10 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 
   const COLS = 5;
   const MAX_IN_COL = 5;
-  const HANDS = 3;
+  /* hands continue while each total reaches MIN_WIN; the first miss ends the game (from arcade footage) */
+  const MIN_WIN = 97;
+  /* each hand scores (table win + speed bonus) x 100: two winning hands reached 132,000 on the cabinet */
+  const SCALE = 100;
   const SPILLS = 1;
   const SPEED_START = 300;
   const SPEED_DRAIN = 4; /* per second, measured from arcade footage */
@@ -2557,8 +2560,8 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       if (this.state === 'handEnd') {
         if (this.stateT > 1) {
           UT.sfx.tap();
-          if (this.hand >= HANDS) this.finish();
-          else this.startHand();
+          if (this.result.win > 0) this.startHand();
+          else this.finish();
         }
         return;
       }
@@ -2614,17 +2617,21 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       const sum = this.sum();
       const win = payout(sum);
       const speed = win > 0 ? this.speed : 0; /* the speed bonus only counts on a paying total */
-      this.result = { reason, sum, win, speed, points: win + speed };
+      this.result = { reason, sum, win, speed, points: (win + speed) * SCALE };
       this.score += this.result.points;
       this.hands.push(this.result);
       this.state = 'handEnd';
       this.stateT = 0;
-      if (win > 0) UT.sfx.win(); else UT.sfx.lose();
-      if (this.hand >= HANDS) this.onRecord(this.gameResult());
+      if (win > 0) UT.sfx.win();
+      else {
+        UT.sfx.lose();
+        /* the game ends on a losing hand: save the score now */
+        this.onRecord(this.gameResult());
+      }
     }
 
     gameResult() {
-      if (!this._result) this._result = { game: 'fizz21', score: this.score, hands: this.hands.map((h) => h.sum), best: Math.max(...this.hands.map((h) => h.sum)) };
+      if (!this._result) this._result = { game: 'fizz21', score: this.score, hands: this.hands.map((h) => h.sum), best: Math.max(...this.hands.map((h) => h.sum)), won: this.hands.filter((h) => h.win > 0).length };
       return this._result;
     }
 
@@ -2678,6 +2685,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
         g.lineWidth = 2;
         g.stroke();
         D.text(g, String(t), cx, L.totalsY + 1, 18, INK, { family: UT.font.display, weight: 400 });
+        if (t !== hard(this.cols[i])) D.text(g, 'SOFT', cx, L.totalsY + 26, 11, '#0f7f7a', { family: UT.font.display, weight: 400 });
       }
       g.strokeStyle = 'rgba(19,32,43,0.35)';
       g.lineWidth = 3;
@@ -2785,6 +2793,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       D.rrect(g, x, 130, w, 260, 10);
       g.fill();
       D.text(g, 'TOTAL', x + 34, 148, 11, C.dim, { weight: 800 });
+      D.text(g, '×' + SCALE, x + w / 2, 148, 11, C.amber, { weight: 800 });
       D.text(g, 'PAYS', x + w - 34, 148, 11, C.dim, { weight: 800 });
       for (let t = 105, k = 0; t >= 97; t--, k++) {
         const y = 172 + k * 24;
@@ -2850,12 +2859,12 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
     drawIntro(g) {
       const { y } = this.panel(g, 520, 250);
       const cx = this.W / 2;
-      D.text(g, 'HAND ' + this.hand + ' OF ' + HANDS, cx, y + 44, 34, RED, { family: UT.font.display, weight: 400 });
+      D.text(g, 'HAND ' + this.hand, cx, y + 44, 34, RED, { family: UT.font.display, weight: 400 });
       const lines = [
         'Pour each glass into any of 5 columns without going over 21.',
         'A column is done at 21 or after 5 glasses. Aces count 1 or 11: a soft 21 can still take more.',
         'Spill one unwanted glass per hand. Faster play keeps more speed bonus.',
-        'Your 5-column total pays: 105 = 1,000 … 97 = 50 (+ speed bonus).',
+        'Total 97+ pays (105 = 1,000 … 97 = 50, plus speed bonus) ×' + SCALE + '. Under 97 ends the game.',
       ];
       lines.forEach((t, i) => D.text(g, t, cx, y + 92 + i * 26, 14, INK, { weight: i === 3 ? 800 : 600 }));
       if (this.stateT > 0.3) D.text(g, 'TAP TO POUR', cx, y + 220, 16, TEAL, { weight: 800 });
@@ -2867,10 +2876,10 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       const cx = this.W / 2;
       D.text(g, r.win ? 'TOTAL ' + r.sum + '!' : 'TOTAL ' + r.sum, cx, y + 44, 34, r.win ? TEAL : RED, { family: UT.font.display, weight: 400 });
       D.text(g, r.reason, cx, y + 82, 14, '#5b6470', { weight: 600 });
-      D.text(g, r.win ? 'Table pays  +' + r.win.toLocaleString() : 'Below 97: the table pays nothing', cx, y + 112, 16, INK, { weight: 700 });
-      if (r.win) D.text(g, 'Speed bonus  +' + r.speed, cx, y + 136, 16, INK, { weight: 700 });
+      D.text(g, r.win ? '(' + r.win + ' table + ' + r.speed + ' speed) ×' + SCALE + ' = +' + r.points.toLocaleString() : MIN_WIN + ' NEEDED TO WIN', cx, y + 114, r.win ? 16 : 22, r.win ? INK : RED, { weight: 800 });
+      if (!r.win) D.text(g, 'Game over after ' + (this.hand - 1) + (this.hand === 2 ? ' winning hand' : ' winning hands'), cx, y + 140, 14, '#5b6470', { weight: 600 });
       D.text(g, 'Score ' + this.score.toLocaleString(), cx, y + 172, 22, RED, { weight: 800 });
-      const more = this.hand < HANDS ? 'TAP FOR HAND ' + (this.hand + 1) : 'TAP TO FINISH';
+      const more = r.win ? 'TAP FOR HAND ' + (this.hand + 1) : 'TAP TO FINISH';
       if (this.stateT > 1) D.text(g, more, cx, y + 220, 16, TEAL, { weight: 800 });
     }
   }
@@ -3314,7 +3323,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
   const E = CFG.entries || {};
 
   /* highest believable score per board; anything above is ignored when reading */
-  const MAX = { 'swish-arcade': 3000, pairoff: 800000, fizz21: 4000, streak21: 1500000 };
+  const MAX = { 'swish-arcade': 3000, pairoff: 800000, fizz21: 20000000, streak21: 1500000 };
   const NAME_MAX = 12;
 
   let cache = null; /* { at, rows } */
@@ -3667,7 +3676,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       const rank = UT.scores.add('streak21', r.score, r.twentyOnes + ' hands' + (r.bonus ? ' · bonus deck' : ''));
       if (rank >= 0) ranks.push(rank);
     } else if (r.game === 'fizz21') {
-      const rank = UT.scores.add('fizz21', r.score, 'Best total ' + r.best);
+      const rank = UT.scores.add('fizz21', r.score, r.won + (r.won === 1 ? ' hand won' : ' hands won'));
       if (rank >= 0) ranks.push(rank);
     } else {
       const rank = UT.scores.add('pairoff', r.score, r.bonus ? 'Bonus round' : 'Round ' + r.round);
@@ -3703,7 +3712,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
       body += '<p class="note">' + r.twentyOnes + ' hands cleared · ' + r.busts + ' busts' + (r.bonus ? ' · played the bonus deck' : '') + '</p>';
     } else if (r.game === 'fizz21') {
       body += '<div class="big-score">' + r.score.toLocaleString() + '</div>';
-      body += '<p class="note">Hand totals ' + r.hands.join(' · ') + ' (97 or more pays)</p>';
+      body += '<p class="note">' + r.won + (r.won === 1 ? ' hand won' : ' hands won') + ' · totals ' + r.hands.join(' · ') + ' (97 needed)</p>';
     } else {
       body += '<div class="big-score">' + r.score.toLocaleString() + '</div>';
       body += '<p class="note">' + esc(r.reason) + ' · ' + (r.bonus ? 'played the bonus round' : 'round ' + r.round + ' of 2') + ' · ' + r.boards + (r.boards === 1 ? ' board' : ' boards') + ' · ' + r.pairs + ' pairs, ' + r.runs + ' runs</p>';
@@ -3720,7 +3729,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 
   /* ---------- shared leaderboard ---------- */
   function scorers(r) {
-    return r.game === 'swish' ? r.players.map((p) => ({ label: p.name, score: p.score, detail: p.bonus ? 'Bonus round' : r.players.length > 1 ? p.made + '/' + p.shots : 'Round ' + Math.min(p.rounds + 1, r.rounds) })) : r.game === 'fizz21' ? [{ label: 'You', score: r.score, detail: 'Best total ' + r.best }] : r.game === 'streak21' ? [{ label: 'You', score: r.score, detail: r.twentyOnes + ' hands' + (r.bonus ? ' + bonus' : '') }] : [{ label: 'You', score: r.score, detail: r.bonus ? 'Bonus round' : 'Round ' + r.round }];
+    return r.game === 'swish' ? r.players.map((p) => ({ label: p.name, score: p.score, detail: p.bonus ? 'Bonus round' : r.players.length > 1 ? p.made + '/' + p.shots : 'Round ' + Math.min(p.rounds + 1, r.rounds) })) : r.game === 'fizz21' ? [{ label: 'You', score: r.score, detail: r.won + (r.won === 1 ? ' hand won' : ' hands won') }] : r.game === 'streak21' ? [{ label: 'You', score: r.score, detail: r.twentyOnes + ' hands' + (r.bonus ? ' + bonus' : '') }] : [{ label: 'You', score: r.score, detail: r.bonus ? 'Bonus round' : 'Round ' + r.round }];
   }
   function postHtml(r) {
     const who = scorers(r);

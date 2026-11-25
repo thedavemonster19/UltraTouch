@@ -1,8 +1,8 @@
 /* Fizz 21 — a stack-to-21 game across five columns, three hands a game.
  * Mechanics follow the bar-top classic: drop each numbered glass onto any of five columns without going over 21;
  * a column is done at 21 or after five glasses; one unwanted glass may be spilled (passed) per hand; the total
- * of all five columns pays on a table from 97 to 105; a speed bonus drains while you play.
- * Soda-fountain theme, art, name and hand structure are our own. */
+ * of all five columns pays on a table from 97 to 105; a speed bonus drains while you play; hands continue while
+ * you reach 97, and the first miss ends the game. Soda-fountain theme, art and name are our own. */
 (function () {
   'use strict';
   const UT = window.UT;
@@ -11,7 +11,10 @@
 
   const COLS = 5;
   const MAX_IN_COL = 5;
-  const HANDS = 3;
+  /* hands continue while each total reaches MIN_WIN; the first miss ends the game (from arcade footage) */
+  const MIN_WIN = 97;
+  /* each hand scores (table win + speed bonus) x 100: two winning hands reached 132,000 on the cabinet */
+  const SCALE = 100;
   const SPILLS = 1;
   const SPEED_START = 300;
   const SPEED_DRAIN = 4; /* per second, measured from arcade footage */
@@ -116,8 +119,8 @@
       if (this.state === 'handEnd') {
         if (this.stateT > 1) {
           UT.sfx.tap();
-          if (this.hand >= HANDS) this.finish();
-          else this.startHand();
+          if (this.result.win > 0) this.startHand();
+          else this.finish();
         }
         return;
       }
@@ -173,17 +176,21 @@
       const sum = this.sum();
       const win = payout(sum);
       const speed = win > 0 ? this.speed : 0; /* the speed bonus only counts on a paying total */
-      this.result = { reason, sum, win, speed, points: win + speed };
+      this.result = { reason, sum, win, speed, points: (win + speed) * SCALE };
       this.score += this.result.points;
       this.hands.push(this.result);
       this.state = 'handEnd';
       this.stateT = 0;
-      if (win > 0) UT.sfx.win(); else UT.sfx.lose();
-      if (this.hand >= HANDS) this.onRecord(this.gameResult());
+      if (win > 0) UT.sfx.win();
+      else {
+        UT.sfx.lose();
+        /* the game ends on a losing hand: save the score now */
+        this.onRecord(this.gameResult());
+      }
     }
 
     gameResult() {
-      if (!this._result) this._result = { game: 'fizz21', score: this.score, hands: this.hands.map((h) => h.sum), best: Math.max(...this.hands.map((h) => h.sum)) };
+      if (!this._result) this._result = { game: 'fizz21', score: this.score, hands: this.hands.map((h) => h.sum), best: Math.max(...this.hands.map((h) => h.sum)), won: this.hands.filter((h) => h.win > 0).length };
       return this._result;
     }
 
@@ -237,6 +244,7 @@
         g.lineWidth = 2;
         g.stroke();
         D.text(g, String(t), cx, L.totalsY + 1, 18, INK, { family: UT.font.display, weight: 400 });
+        if (t !== hard(this.cols[i])) D.text(g, 'SOFT', cx, L.totalsY + 26, 11, '#0f7f7a', { family: UT.font.display, weight: 400 });
       }
       g.strokeStyle = 'rgba(19,32,43,0.35)';
       g.lineWidth = 3;
@@ -344,6 +352,7 @@
       D.rrect(g, x, 130, w, 260, 10);
       g.fill();
       D.text(g, 'TOTAL', x + 34, 148, 11, C.dim, { weight: 800 });
+      D.text(g, '×' + SCALE, x + w / 2, 148, 11, C.amber, { weight: 800 });
       D.text(g, 'PAYS', x + w - 34, 148, 11, C.dim, { weight: 800 });
       for (let t = 105, k = 0; t >= 97; t--, k++) {
         const y = 172 + k * 24;
@@ -409,12 +418,12 @@
     drawIntro(g) {
       const { y } = this.panel(g, 520, 250);
       const cx = this.W / 2;
-      D.text(g, 'HAND ' + this.hand + ' OF ' + HANDS, cx, y + 44, 34, RED, { family: UT.font.display, weight: 400 });
+      D.text(g, 'HAND ' + this.hand, cx, y + 44, 34, RED, { family: UT.font.display, weight: 400 });
       const lines = [
         'Pour each glass into any of 5 columns without going over 21.',
         'A column is done at 21 or after 5 glasses. Aces count 1 or 11: a soft 21 can still take more.',
         'Spill one unwanted glass per hand. Faster play keeps more speed bonus.',
-        'Your 5-column total pays: 105 = 1,000 … 97 = 50 (+ speed bonus).',
+        'Total 97+ pays (105 = 1,000 … 97 = 50, plus speed bonus) ×' + SCALE + '. Under 97 ends the game.',
       ];
       lines.forEach((t, i) => D.text(g, t, cx, y + 92 + i * 26, 14, INK, { weight: i === 3 ? 800 : 600 }));
       if (this.stateT > 0.3) D.text(g, 'TAP TO POUR', cx, y + 220, 16, TEAL, { weight: 800 });
@@ -426,10 +435,10 @@
       const cx = this.W / 2;
       D.text(g, r.win ? 'TOTAL ' + r.sum + '!' : 'TOTAL ' + r.sum, cx, y + 44, 34, r.win ? TEAL : RED, { family: UT.font.display, weight: 400 });
       D.text(g, r.reason, cx, y + 82, 14, '#5b6470', { weight: 600 });
-      D.text(g, r.win ? 'Table pays  +' + r.win.toLocaleString() : 'Below 97: the table pays nothing', cx, y + 112, 16, INK, { weight: 700 });
-      if (r.win) D.text(g, 'Speed bonus  +' + r.speed, cx, y + 136, 16, INK, { weight: 700 });
+      D.text(g, r.win ? '(' + r.win + ' table + ' + r.speed + ' speed) ×' + SCALE + ' = +' + r.points.toLocaleString() : MIN_WIN + ' NEEDED TO WIN', cx, y + 114, r.win ? 16 : 22, r.win ? INK : RED, { weight: 800 });
+      if (!r.win) D.text(g, 'Game over after ' + (this.hand - 1) + (this.hand === 2 ? ' winning hand' : ' winning hands'), cx, y + 140, 14, '#5b6470', { weight: 600 });
       D.text(g, 'Score ' + this.score.toLocaleString(), cx, y + 172, 22, RED, { weight: 800 });
-      const more = this.hand < HANDS ? 'TAP FOR HAND ' + (this.hand + 1) : 'TAP TO FINISH';
+      const more = r.win ? 'TAP FOR HAND ' + (this.hand + 1) : 'TAP TO FINISH';
       if (this.stateT > 1) D.text(g, more, cx, y + 220, 16, TEAL, { weight: 800 });
     }
   }
