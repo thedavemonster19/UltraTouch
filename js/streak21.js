@@ -16,7 +16,10 @@
   const STREAK_STEP = 1000;
   const BUST_COST = 1000;
   const BONUS_TARGET = 150000;
-  const DECKS = 2; /* a 104-card shoe: one 52-card deck is too short to ever reach the 150,000 bonus mark */
+  const DECKS = 1; /* one 52-card deck: about 17 hands, so 150,000 needs a near-perfect streak (1k + 2k + ... + 17k) */
+  const ROUND_TIME = 120;
+  const DOTS = 20;
+  const DOT_BONUS = 200; /* per timer dot left when the deck is finished or the score is taken, as in Take 2 */
   const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
   const SUITS = ['♠', '♥', '♦', '♣'];
   const RED = [false, true, true, false];
@@ -71,6 +74,9 @@
       this.next = this.deck.pop();
       this.state = 'intro';
       this.stateT = 0;
+      this.timeLeft = ROUND_TIME;
+      this.timeBonus = 0;
+      this.lastTick = 11;
     }
 
     resize(W, H) {
@@ -87,6 +93,7 @@
         totalsY: 96, stackY: 126,
         next: { x: 26, y: 118, w: 76, h: 106 },
         skip: { x: 18, y: 250, w: 92, h: 42 },
+        take: { x: 18, y: 318, w: 92, h: 50 },
       };
     }
     colX(i) { return this.L.x0 + i * this.L.colW + this.L.colW / 2; }
@@ -136,10 +143,14 @@
 
     advance() {
       this.next = this.deck.pop() || null;
-      if (!this.next) this.endDeck();
+      if (!this.next) this.endDeck('Deck finished');
     }
 
-    endDeck() {
+    endDeck(reason) {
+      this.reason = reason || 'Deck finished';
+      const dots = (this.timeLeft / ROUND_TIME) * DOTS;
+      this.timeBonus = this.timeLeft > 0 ? Math.round((dots * DOT_BONUS) / 50) * 50 : 0;
+      this.score += this.timeBonus;
       this.state = 'deckEnd';
       this.stateT = 0;
       this.nextStep = !this.bonusDeck && this.score >= BONUS_TARGET ? 'bonus' : 'over';
@@ -178,6 +189,7 @@
       }
       if (this.state !== 'play' || this.flying) return;
       if (this.inBox(x, y, L.skip)) { this.skip(); return; }
+      if (this.inBox(x, y, L.take)) { UT.sfx.tap(); this.endDeck('You took the score'); return; }
       if (x < L.x0 || x > L.x0 + COLS * L.colW || y < L.totalsY - 24) return;
       this.place(Math.floor((x - L.x0) / L.colW));
     }
@@ -192,6 +204,16 @@
       }
       this.clearing.forEach((c) => (c.t += dt));
       this.clearing = this.clearing.filter((c) => c.t < 0.5);
+      if (this.state === 'play') {
+        this.timeLeft -= dt;
+        const whole = Math.ceil(this.timeLeft);
+        if (whole < this.lastTick && whole > 0) { this.lastTick = whole; UT.sfx.tick(); }
+        if (this.timeLeft <= 0) {
+          this.timeLeft = 0;
+          UT.sfx.horn();
+          this.endDeck('Time ran out');
+        }
+      }
     }
 
     /* ---------- drawing ---------- */
@@ -260,6 +282,15 @@
       g.fill();
       D.text(g, 'SKIP ×' + this.skips, sk.x + sk.w / 2, sk.y + sk.h / 2 + 1, 15, '#ffffff', { family: UT.font.display, weight: 400 });
       D.text(g, 'resets the streak', sk.x + sk.w / 2, sk.y + sk.h + 12, 10, 'rgba(255,255,255,0.55)', { weight: 700 });
+      const tk = L.take;
+      g.fillStyle = NAVY;
+      D.rrect(g, tk.x, tk.y, tk.w, tk.h, 12);
+      g.fill();
+      g.strokeStyle = NEON;
+      g.lineWidth = 2;
+      g.stroke();
+      D.text(g, 'TAKE', tk.x + tk.w / 2, tk.y + tk.h / 2 - 8, 13, '#ffffff', { family: UT.font.display, weight: 400 });
+      D.text(g, 'SCORE', tk.x + tk.w / 2, tk.y + tk.h / 2 + 9, 13, '#ffffff', { family: UT.font.display, weight: 400 });
 
       this.popups.draw(g);
       if (this.state === 'intro') this.drawIntro(g);
@@ -272,7 +303,22 @@
       g.fillStyle = NEON;
       g.fillRect(0, 58, this.W, 2);
       D.text(g, 'STREAK 21', this.W / 2 - this.L.right / 2 + 30, 30, 28, '#ffffff', { family: UT.font.display, weight: 400, stroke: PINK, strokeWidth: 5 });
-      if (this.bonusDeck) D.text(g, 'BONUS DECK', this.W / 2 - this.L.right / 2 + 200, 30, 14, C.amber, { family: UT.font.display, weight: 400 });
+      if (this.bonusDeck) D.text(g, 'BONUS DECK', this.W / 2 - this.L.right / 2 + 30, 76, 12, C.amber, { family: UT.font.display, weight: 400 });
+      /* dot timer, right of the title */
+      const tx = this.W / 2 - this.L.right / 2 + 150;
+      const tw = Math.max(110, this.W - this.L.right - tx - 30);
+      g.fillStyle = NAVY;
+      D.rrect(g, tx - 6, 18, tw + 12, 22, 11);
+      g.fill();
+      const lit = Math.ceil((this.timeLeft / ROUND_TIME) * DOTS);
+      for (let i = 0; i < DOTS; i++) {
+        const on = i >= DOTS - lit;
+        const f = i / DOTS;
+        g.fillStyle = !on ? '#26304f' : f < 0.2 ? '#ff4d5e' : f < 0.45 ? '#ffd23f' : NEON;
+        g.beginPath();
+        g.arc(tx + 4 + (i * (tw - 8)) / (DOTS - 1), 29, 4.5, 0, Math.PI * 2);
+        g.fill();
+      }
     }
 
     /* score, best and the streak counter (bottom right, like the cabinet's 21 counter) */
@@ -349,7 +395,7 @@
         'Place each card in one of 4 columns. Hit 21 (or 5 cards under 21) to clear it.',
         'Every 21 in a row pays 1,000 more: 1,000, 2,000, 3,000…',
         'A skip (3 per game) resets the streak to 1,000.',
-        'Going over 21 costs ' + BUST_COST.toLocaleString() + '. Aces are 1 or 11.',
+        'Going over 21 costs ' + BUST_COST.toLocaleString() + '. Aces are 1 or 11. ' + ROUND_TIME / 60 + ' minutes on the clock.',
         this.bonusDeck ? 'One more deck. Your streak carries on.' : 'Finish the deck with ' + BONUS_TARGET.toLocaleString() + '+ to earn a bonus deck.',
       ];
       lines.forEach((t, i) => D.text(g, t, cx, y + 84 + i * 26, 14, i === 1 ? C.amber : '#e6ecff', { weight: i === 1 ? 800 : 600 }));
@@ -357,14 +403,15 @@
     }
 
     drawDeckEnd(g) {
-      const { y } = this.panel(g, 460, 220);
+      const { y } = this.panel(g, 460, 240);
       const cx = this.W / 2;
       const bonus = this.nextStep === 'bonus';
-      D.text(g, bonus ? 'BONUS DECK!' : 'DECK DONE', cx, y + 46, 34, bonus ? C.amber : PINK, { family: UT.font.display, weight: 400 });
-      D.text(g, this.twentyOnes + ' hands cleared · ' + this.busts + ' busts', cx, y + 88, 15, '#e6ecff', { weight: 600 });
-      D.text(g, 'Score ' + this.score.toLocaleString(), cx, y + 122, 22, C.amber, { weight: 800 });
-      D.text(g, bonus ? 'Over ' + BONUS_TARGET.toLocaleString() + ': one more deck, streak intact' : this.bonusDeck ? 'Bonus deck finished' : 'Needed ' + BONUS_TARGET.toLocaleString() + ' for the bonus deck', cx, y + 154, 14, '#e6ecff', { weight: 600 });
-      if (this.stateT > 1) D.text(g, 'TAP TO CONTINUE', cx, y + 196, 15, NEON, { weight: 800 });
+      D.text(g, bonus ? 'BONUS DECK!' : 'DECK DONE', cx, y + 40, 34, bonus ? C.amber : PINK, { family: UT.font.display, weight: 400 });
+      D.text(g, this.reason + ' · ' + this.twentyOnes + ' hands · ' + this.busts + ' busts', cx, y + 78, 14, '#e6ecff', { weight: 600 });
+      if (this.timeBonus) D.text(g, 'Time bonus +' + this.timeBonus.toLocaleString() + ' (' + DOT_BONUS + ' per timer dot left)', cx, y + 102, 14, NEON, { weight: 700 });
+      D.text(g, 'Score ' + this.score.toLocaleString(), cx, y + 136, 22, C.amber, { weight: 800 });
+      D.text(g, bonus ? 'Over ' + BONUS_TARGET.toLocaleString() + ': one more deck, streak intact' : this.bonusDeck ? 'Bonus deck finished' : 'Needed ' + BONUS_TARGET.toLocaleString() + ' for the bonus deck', cx, y + 168, 14, '#e6ecff', { weight: 600 });
+      if (this.stateT > 1) D.text(g, 'TAP TO CONTINUE', cx, y + 212, 15, NEON, { weight: 800 });
     }
   }
 

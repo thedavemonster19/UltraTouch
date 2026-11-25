@@ -46,6 +46,8 @@
     if (aces && t + 10 <= 21) t += 10;
     return t;
   }
+  /* every ace counted as 1: a soft 21 (A + 10) can still take more, as on the machine */
+  function hard(col) { return col.reduce((n, c) => n + c.value, 0); }
   function payout(sum) { return PAYOUT[sum] || 0; }
 
   class Fizz21 {
@@ -79,8 +81,8 @@
     }
 
     get speed() { return Math.max(0, Math.round(SPEED_START - SPEED_DRAIN * this.speedT)); }
-    locked(i) { const c = this.cols[i]; return total(c) >= 21 || c.length >= MAX_IN_COL; }
-    fits(i, card) { return !this.locked(i) && total(this.cols[i].concat([card])) <= 21; }
+    locked(i) { const c = this.cols[i]; return hard(c) >= 21 || c.length >= MAX_IN_COL; }
+    fits(i, card) { return !this.locked(i) && hard(this.cols[i].concat([card])) <= 21; }
     sum() { return this.cols.reduce((n, c) => n + total(c), 0); }
 
     resize(W, H) {
@@ -228,7 +230,7 @@
       for (let i = 0; i < COLS; i++) {
         const cx = this.colX(i);
         const t = total(this.cols[i]);
-        g.fillStyle = this.locked(i) ? (t === 21 ? C.amber : C.mint) : '#ffffff';
+        g.fillStyle = t === 21 ? C.amber : this.locked(i) ? C.mint : '#ffffff';
         D.rrect(g, cx - 30, L.totalsY - 16, 60, 32, 8);
         g.fill();
         g.strokeStyle = INK;
@@ -410,7 +412,7 @@
       D.text(g, 'HAND ' + this.hand + ' OF ' + HANDS, cx, y + 44, 34, RED, { family: UT.font.display, weight: 400 });
       const lines = [
         'Pour each glass into any of 5 columns without going over 21.',
-        'A column is done at 21 or after 5 glasses. Aces count 1 or 11.',
+        'A column is done at 21 or after 5 glasses. Aces count 1 or 11: a soft 21 can still take more.',
         'Spill one unwanted glass per hand. Faster play keeps more speed bonus.',
         'Your 5-column total pays: 105 = 1,000 … 97 = 50 (+ speed bonus).',
       ];
