@@ -254,7 +254,7 @@
         if (rank >= 0) ranks.push(rank);
       });
     } else if (r.game === 'streak21') {
-      const rank = UT.scores.add('streak21', r.score, r.twentyOnes + ' hands' + (r.bonus ? ' · bonus deck' : ''));
+      const rank = UT.scores.add('streak21', r.score, r.twentyOnes + ' hands' + (r.bonus ? ' · bonus round' : ''));
       if (rank >= 0) ranks.push(rank);
     } else if (r.game === 'fizz21') {
       const rank = UT.scores.add('fizz21', r.score, r.won + (r.won === 1 ? ' hand won' : ' hands won'));
@@ -290,7 +290,7 @@
       }
     } else if (r.game === 'streak21') {
       body += '<div class="big-score">' + r.score.toLocaleString() + '</div>';
-      body += '<p class="note">' + r.twentyOnes + ' hands cleared · ' + r.busts + ' busts' + (r.bonus ? ' · played the bonus deck' : '') + '</p>';
+      body += '<p class="note">' + r.twentyOnes + ' hands cleared · ' + (r.bonus ? 'played the bonus round' : 'round ' + Math.min(r.round, 2) + ' of 2') + '</p>';
     } else if (r.game === 'fizz21') {
       body += '<div class="big-score">' + r.score.toLocaleString() + '</div>';
       body += '<p class="note">' + r.won + (r.won === 1 ? ' hand won' : ' hands won') + ' · totals ' + r.hands.join(' · ') + ' (97 needed)</p>';

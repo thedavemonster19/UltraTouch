@@ -1,9 +1,10 @@
-/* Streak 21 — build hands of 21 in four columns from one deck.
+/* Streak 21 — build hands of 21 in four columns; two rounds, plus a bonus round at 150,000.
  * Mechanics follow the bar-top classic as Merit describes it: place each card in any of 4 columns; a column that
  * reaches 21, or holds 5 cards under 21, clears and scores; going over 21 costs points; 3 skips per game.
  * Scoring per a player who knew the machine: each 21 is worth the streak value, which starts at 1,000 and rises
- * 1,000 with every hand cleared in a row; a skip drops it back to 1,000 (a bust only costs points). 150,000 by the end of the deck
- * earns a bonus deck. Name, art and the bust/bonus details are our own. */
+ * 1,000 with every hand cleared in a row; a skip drops it back to 1,000. A card that would go over 21 can't be placed:
+ * when nothing fits and the skips are gone, take the score. Two rounds (one deck and 3 skips each), then a bonus round
+ * at 150,000+ (per players who knew the machine). Name and art are our own. */
 (function () {
   'use strict';
   const UT = window.UT;
@@ -14,7 +15,7 @@
   const MAX_IN_COL = 5;
   const SKIPS = 3;
   const STREAK_STEP = 1000;
-  const BUST_COST = 1000;
+  const ROUNDS = 2;
   const BONUS_TARGET = 150000;
   const DECKS = 1; /* one 52-card deck: about 17 hands, so 150,000 needs a near-perfect streak (1k + 2k + ... + 17k) */
   const ROUND_TIME = 120;
@@ -52,8 +53,6 @@
       this.score = 0;
       this.streak = STREAK_STEP; /* what the next 21 pays */
       this.twentyOnes = 0;
-      this.busts = 0;
-      this.skips = SKIPS;
       this.deckNo = 0;
       this.best = UT.scores.best('streak21');
       this.popups = new UT.Popups();
@@ -65,11 +64,13 @@
       this.startDeck();
     }
 
-    get bonusDeck() { return this.deckNo > 1; }
+    get bonusDeck() { return this.deckNo > ROUNDS; }
 
     startDeck() {
       this.deckNo++;
       this.deck = shuffledDeck();
+      this.skips = SKIPS; /* skips reset every round; the streak carries over until you skip */
+      this.stuckT = 0;
       this.cols = [[], [], [], []];
       this.next = this.deck.pop();
       this.state = 'intro';
@@ -103,12 +104,16 @@
       if (i < 0 || i >= COLS || !this.next) return;
       const card = this.next;
       const col = this.cols[i];
+      if (total(col.concat([card])) > 21) {
+        UT.sfx.nope();
+        this.popups.add('OVER 21', this.colX(i), this.L.totalsY + 50, C.coral, 22);
+        return;
+      }
       col.push(card);
       this.flying = { card, t: 0 };
       UT.sfx.select();
       const t = total(col);
-      if (t === 21 || (t < 21 && col.length >= MAX_IN_COL)) this.clearCol(i, t === 21 ? '21!' : '5 CARDS');
-      else if (t > 21) this.bust(i);
+      if (t === 21 || col.length >= MAX_IN_COL) this.clearCol(i, t === 21 ? '21!' : '5 CARDS');
       this.advance();
     }
 
@@ -121,15 +126,6 @@
       this.clearing.push({ cards: this.cols[i], i, t: 0, kind: 'win' });
       this.cols[i] = [];
       UT.sfx.match(Math.min(8, this.streak / STREAK_STEP));
-    }
-
-    bust(i) {
-      this.score = Math.max(0, this.score - BUST_COST);
-      this.busts++;
-      this.popups.add('BUST −' + BUST_COST.toLocaleString(), this.colX(i), this.L.totalsY + 50, C.coral, 24);
-      this.clearing.push({ cards: this.cols[i], i, t: 0, kind: 'bust' });
-      this.cols[i] = [];
-      UT.sfx.nope();
     }
 
     skip() {
@@ -146,6 +142,9 @@
       if (!this.next) this.endDeck('Deck finished');
     }
 
+    /* true when the next card goes over 21 in every column */
+    noFit() { return !!this.next && this.cols.every((c) => total(c.concat([this.next])) > 21); }
+
     endDeck(reason) {
       this.reason = reason || 'Deck finished';
       const dots = (this.timeLeft / ROUND_TIME) * DOTS;
@@ -153,15 +152,16 @@
       this.score += this.timeBonus;
       this.state = 'deckEnd';
       this.stateT = 0;
-      this.nextStep = !this.bonusDeck && this.score >= BONUS_TARGET ? 'bonus' : 'over';
+      this.nextStep = this.deckNo < ROUNDS ? 'round' : this.deckNo === ROUNDS && this.score >= BONUS_TARGET ? 'bonus' : 'over';
       if (this.nextStep === 'over') {
         UT.sfx.lose();
         this.onRecord(this.result());
-      } else UT.sfx.heat();
+      } else if (this.nextStep === 'bonus') UT.sfx.heat();
+      else UT.sfx.win();
     }
 
     result() {
-      if (!this._result) this._result = { game: 'streak21', score: this.score, twentyOnes: this.twentyOnes, busts: this.busts, bonus: this.bonusDeck };
+      if (!this._result) this._result = { game: 'streak21', score: this.score, twentyOnes: this.twentyOnes, round: Math.min(this.deckNo, ROUNDS + 1), bonus: this.bonusDeck };
       return this._result;
     }
 
@@ -182,8 +182,8 @@
       if (this.state === 'deckEnd') {
         if (this.stateT > 1) {
           UT.sfx.tap();
-          if (this.nextStep === 'bonus') this.startDeck();
-          else this.finish();
+          if (this.nextStep === 'over') this.finish();
+          else this.startDeck();
         }
         return;
       }
@@ -283,14 +283,17 @@
       D.text(g, 'SKIP ×' + this.skips, sk.x + sk.w / 2, sk.y + sk.h / 2 + 1, 15, '#ffffff', { family: UT.font.display, weight: 400 });
       D.text(g, 'resets the streak', sk.x + sk.w / 2, sk.y + sk.h + 12, 10, 'rgba(255,255,255,0.55)', { weight: 700 });
       const tk = L.take;
-      g.fillStyle = NAVY;
+      const stuck = this.state === 'play' && this.noFit();
+      const glow = stuck && this.skips === 0 && Math.sin(this.clock * 10) > 0;
+      g.fillStyle = glow ? PINK : NAVY;
       D.rrect(g, tk.x, tk.y, tk.w, tk.h, 12);
       g.fill();
-      g.strokeStyle = NEON;
+      g.strokeStyle = stuck && this.skips === 0 ? PINK : NEON;
       g.lineWidth = 2;
       g.stroke();
       D.text(g, 'TAKE', tk.x + tk.w / 2, tk.y + tk.h / 2 - 8, 13, '#ffffff', { family: UT.font.display, weight: 400 });
       D.text(g, 'SCORE', tk.x + tk.w / 2, tk.y + tk.h / 2 + 9, 13, '#ffffff', { family: UT.font.display, weight: 400 });
+      if (stuck) D.text(g, this.skips > 0 ? 'Nothing fits: skip it' : 'Nothing fits: take score', tk.x + tk.w / 2, tk.y + tk.h + 14, 10, C.coral, { weight: 800 });
 
       this.popups.draw(g);
       if (this.state === 'intro') this.drawIntro(g);
@@ -303,7 +306,7 @@
       g.fillStyle = NEON;
       g.fillRect(0, 58, this.W, 2);
       D.text(g, 'STREAK 21', this.W / 2 - this.L.right / 2 + 30, 30, 28, '#ffffff', { family: UT.font.display, weight: 400, stroke: PINK, strokeWidth: 5 });
-      if (this.bonusDeck) D.text(g, 'BONUS DECK', this.W / 2 - this.L.right / 2 + 30, 76, 12, C.amber, { family: UT.font.display, weight: 400 });
+      D.text(g, this.bonusDeck ? 'BONUS ROUND' : 'ROUND ' + this.deckNo + ' OF ' + ROUNDS, this.W / 2 - this.L.right / 2 + 30, 76, 12, this.bonusDeck ? C.amber : NEON, { family: UT.font.display, weight: 400 });
       /* dot timer, right of the title */
       const tx = this.W / 2 - this.L.right / 2 + 150;
       const tw = Math.max(110, this.W - this.L.right - tx - 30);
@@ -331,8 +334,8 @@
       D.text(g, 'SCORE', x + 12, 29, 11, NEON, { align: 'left', weight: 800 });
       D.text(g, this.score.toLocaleString(), x + w - 12, 30, 20, C.amber, { align: 'right', family: UT.font.display, weight: 400 });
       D.text(g, 'BEST ' + Math.max(this.best, this.score).toLocaleString(), x + w / 2, 74, 12, 'rgba(255,255,255,0.7)', { weight: 800 });
-      D.text(g, 'BONUS DECK AT ' + BONUS_TARGET.toLocaleString(), x + w / 2, 94, 11, this.score >= BONUS_TARGET ? C.amber : 'rgba(255,255,255,0.5)', { weight: 800 });
-      D.text(g, '21s ' + this.twentyOnes + '   BUSTS ' + this.busts, x + w / 2, 116, 12, 'rgba(255,255,255,0.75)', { weight: 800 });
+      D.text(g, 'BONUS ROUND AT ' + BONUS_TARGET.toLocaleString(), x + w / 2, 94, 11, this.score >= BONUS_TARGET ? C.amber : 'rgba(255,255,255,0.5)', { weight: 800 });
+      D.text(g, '21s ' + this.twentyOnes + '   SKIPS ' + this.skips, x + w / 2, 116, 12, 'rgba(255,255,255,0.75)', { weight: 800 });
       /* streak counter */
       const cy = this.H - 160;
       g.save();
@@ -390,13 +393,13 @@
     drawIntro(g) {
       const { y } = this.panel(g, 520, 260);
       const cx = this.W / 2;
-      D.text(g, this.bonusDeck ? 'BONUS DECK!' : 'STREAK 21', cx, y + 42, 34, this.bonusDeck ? C.amber : '#ffffff', { family: UT.font.display, weight: 400 });
+      D.text(g, this.bonusDeck ? 'BONUS ROUND!' : 'ROUND ' + this.deckNo + ' OF ' + ROUNDS, cx, y + 42, 34, this.bonusDeck ? C.amber : '#ffffff', { family: UT.font.display, weight: 400 });
       const lines = [
         'Place each card in one of 4 columns. Hit 21 (or 5 cards under 21) to clear it.',
         'Every 21 in a row pays 1,000 more: 1,000, 2,000, 3,000…',
-        'A skip (3 per game) resets the streak to 1,000.',
-        'Going over 21 costs ' + BUST_COST.toLocaleString() + '. Aces are 1 or 11. ' + ROUND_TIME / 60 + ' minutes on the clock.',
-        this.bonusDeck ? 'One more deck. Your streak carries on.' : 'Finish the deck with ' + BONUS_TARGET.toLocaleString() + '+ to earn a bonus deck.',
+        '3 skips this round; a skip resets the streak to 1,000. Cards can\'t go over 21.',
+        'Stuck with no skips? Take the score. Aces are 1 or 11. ' + ROUND_TIME / 60 + ' minutes on the clock.',
+        this.bonusDeck ? 'You beat ' + BONUS_TARGET.toLocaleString() + '. One more round!' : BONUS_TARGET.toLocaleString() + '+ after round ' + ROUNDS + ' earns a bonus round.',
       ];
       lines.forEach((t, i) => D.text(g, t, cx, y + 84 + i * 26, 14, i === 1 ? C.amber : '#e6ecff', { weight: i === 1 ? 800 : 600 }));
       if (this.stateT > 0.3) D.text(g, 'TAP TO DEAL', cx, y + 232, 16, NEON, { weight: 800 });
@@ -406,11 +409,12 @@
       const { y } = this.panel(g, 460, 240);
       const cx = this.W / 2;
       const bonus = this.nextStep === 'bonus';
-      D.text(g, bonus ? 'BONUS DECK!' : 'DECK DONE', cx, y + 40, 34, bonus ? C.amber : PINK, { family: UT.font.display, weight: 400 });
-      D.text(g, this.reason + ' · ' + this.twentyOnes + ' hands · ' + this.busts + ' busts', cx, y + 78, 14, '#e6ecff', { weight: 600 });
+      const title = bonus ? 'BONUS ROUND!' : this.nextStep === 'round' ? 'ROUND ' + this.deckNo + ' DONE' : 'GAME OVER';
+      D.text(g, title, cx, y + 40, 34, bonus ? C.amber : this.nextStep === 'round' ? NEON : PINK, { family: UT.font.display, weight: 400 });
+      D.text(g, this.reason + ' · ' + this.twentyOnes + ' hands cleared so far', cx, y + 78, 14, '#e6ecff', { weight: 600 });
       if (this.timeBonus) D.text(g, 'Time bonus +' + this.timeBonus.toLocaleString() + ' (' + DOT_BONUS + ' per timer dot left)', cx, y + 102, 14, NEON, { weight: 700 });
       D.text(g, 'Score ' + this.score.toLocaleString(), cx, y + 136, 22, C.amber, { weight: 800 });
-      D.text(g, bonus ? 'Over ' + BONUS_TARGET.toLocaleString() + ': one more deck, streak intact' : this.bonusDeck ? 'Bonus deck finished' : 'Needed ' + BONUS_TARGET.toLocaleString() + ' for the bonus deck', cx, y + 168, 14, '#e6ecff', { weight: 600 });
+      D.text(g, bonus ? 'Over ' + BONUS_TARGET.toLocaleString() + ': you earned a bonus round' : this.nextStep === 'round' ? 'Round ' + (this.deckNo + 1) + ' of ' + ROUNDS + ' next · skips reset' : this.bonusDeck ? 'Bonus round finished' : 'Needed ' + BONUS_TARGET.toLocaleString() + ' for the bonus round', cx, y + 168, 14, '#e6ecff', { weight: 600 });
       if (this.stateT > 1) D.text(g, 'TAP TO CONTINUE', cx, y + 212, 15, NEON, { weight: 800 });
     }
   }
